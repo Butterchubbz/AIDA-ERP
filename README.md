@@ -2,6 +2,8 @@
 
 This repository contains AIDA: a React + TypeScript application built with Vite. The README below focuses on running and testing the app locally, preparing a production build, and the PocketBase backend used by the app. The instructions are written with GitLab CI in mind but work equally well locally or in GitHub Actions.
 
+PLEASE NOTE: I am not a programmer, I am a hardware engineer with a logistics background. This was made entirely using AI. If any programmer want to update this with human code, please feel free to do so. There is a story of how this came to be, which I can gladly share.
+
 ## Table of contents
 - Getting started (prereqs)
 - Local development (Vite dev server)
