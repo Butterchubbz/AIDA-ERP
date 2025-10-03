@@ -1,0 +1,32 @@
+name: PocketBase Seed - mappingPresets
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    name: Seed PocketBase Collections
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run seed script
+        env:
+          PBC_ADMIN_TOKEN: ${{ secrets.PBC_ADMIN_TOKEN }}
+          PBC_URL: ${{ secrets.PBC_URL }}
+        run: |
+          node ./scripts/seed-presets.mjs
+
+      - name: Apply collection rules
+        if: ${{ secrets.PBC_ADMIN_TOKEN }}
+        env:
+          PBC_ADMIN_TOKEN: ${{ secrets.PBC_ADMIN_TOKEN }}
+          PBC_URL: ${{ secrets.PBC_URL }}
+        run: |
+          node ./scripts/apply-pb-rules.mjs

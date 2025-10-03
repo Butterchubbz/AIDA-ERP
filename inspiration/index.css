@@ -1,0 +1,80 @@
+/* src/index.css */
+
+/*
+  This file imports Tailwind's base, components, and utilities styles.
+  It also sets up some global CSS variables and basic styling for the body.
+*/
+
+@import 'tailwindcss/preflight';
+@import 'tailwindcss';
+/* Tailwind utilities are now included via @import "tailwindcss"; above. */
+
+/*
+  Global styles for the application.
+  The font-family 'Inter' is imported in public/index.html.
+  We set it here as the default font for the entire application.
+*/
+body {
+  font-family: 'Inter', sans-serif;
+  /* Ensure the body takes full height of the viewport */
+  min-height: 100vh;
+  /* Prevent horizontal scrolling if content overflows */
+  overflow-x: hidden;
+}
+
+/*
+  Basic styling for focus outlines to improve accessibility
+  while maintaining a clean look.
+*/
+*:focus {
+  outline: 2px solid var(--tw-blue-500); /* Use the Tailwind CSS variable for blue-500 */
+  outline-offset: 2px;
+}
+
+/*
+  Custom scrollbar styles (optional, for aesthetics)
+*/
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/*
+  Ensure images are responsive and do not overflow their containers.
+  Use max-width: 100% and height: auto to maintain aspect ratio.
+*/
+img {
+  max-width: 100%;
+  height: auto;
+  display: block; /* Removes extra space below images */
+}
+
+/*
+  A utility class for visually hiding elements while still making them
+  available to screen readers. Useful for accessibility.
+*/
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

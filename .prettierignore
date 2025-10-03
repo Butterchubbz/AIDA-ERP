@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+.git/
+public/
+tmp_postcss_output.css
+*.log
+c/Users/

@@ -1,3 +1,0 @@
-# Auto-detect text files and ensure they use LF (Unix) line endings.
-# This prevents issues with shell scripts on Linux/macOS/WSL.
-* text=auto eol=lf
