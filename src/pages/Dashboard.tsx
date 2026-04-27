@@ -1,9 +1,9 @@
-import { useInventory } from '../hooks/useInventory';
-import { useShipments } from '../hooks/useShipments';
+import { useDeviceInventory } from '../hooks/useInventoryModules';
+import { useShipments } from '../hooks/useShippingModules';
 import { useRMAs } from '../hooks/useRMAs';
 
 const Dashboard = () => {
-  const { inventory, loading: loadingInventory, error: errorInventory } = useInventory();
+  const { devices: inventory, loading: loadingInventory, error: errorInventory } = useDeviceInventory();
   const { shipments, loading: loadingShipments, error: errorShipments } = useShipments();
   const { rmas, loading: loadingRMAs, error: errorRMAs } = useRMAs();
 

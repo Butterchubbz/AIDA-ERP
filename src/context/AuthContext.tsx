@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { pb } from '../lib/pocketbase';
+import { COLLECTIONS } from '../lib/collections';
 import type PocketBase from 'pocketbase';
 import type { RecordModel } from 'pocketbase';
 
@@ -90,6 +91,7 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/** Provides PocketBase auth state and role-derived permissions to the app tree. */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<RecordModel | null>(pb.authStore.model as RecordModel | null); // Cast initial value
   const [userRoles, setUserRoles] = useState<{ [key: string]: string } | null>(
@@ -113,7 +115,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (isAdmin) {
       await pb.admins.authWithPassword(email, pass);
     } else {
-      await pb.collection('users').authWithPassword(email, pass);
+      await pb.collection(COLLECTIONS.USERS).authWithPassword(email, pass);
     }
     // The useEffect hook will handle setting the user and userRoles state
   };
@@ -136,7 +138,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook to use the AuthContext
+/** Returns the active auth context and enforces provider usage. */
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);

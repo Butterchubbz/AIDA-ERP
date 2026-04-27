@@ -14,6 +14,10 @@ dist-ssr
 
 # Environment files
 .env
+.env.local
+.env.production
+.env.staging
+*.env
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +29,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# PocketBase runtime data
+pb_data/
+pb_public/
+
+# Build artifacts
+bundle-report.json
+
+# Sensitive data files
+temp_import.json
+*_import.json
+*_export.json
+amazon_inventory_data.json
+sales_data_temp.csv
+
+# Test output
+test-results/

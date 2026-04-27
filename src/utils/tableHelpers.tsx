@@ -36,6 +36,27 @@ export const naturalSort = (
   b: string | number | undefined,
   direction: 'asc' | 'desc'
 ): number => {
+  function extractStorageSize(str: string): number | null {
+    const match = String(str).match(/(\d+(?:\.\d+)?)\s*(KB|MB|GB|TB|PB)/i);
+    if (!match) return null;
+    const value = parseFloat(match[1]);
+    const unit = match[2].toUpperCase();
+    const multipliers: Record<string, number> = {
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
+      PB: 1024 * 1024 * 1024 * 1024 * 1024,
+    };
+    return value * (multipliers[unit] ?? 1);
+  }
+
+  const sizeA = extractStorageSize(String(a));
+  const sizeB = extractStorageSize(String(b));
+  if (sizeA !== null && sizeB !== null) {
+    return direction === 'asc' ? sizeA - sizeB : sizeB - sizeA;
+  }
+
   const aStr = String(a ?? '');
   const bStr = String(b ?? '');
   const dir = direction === 'asc' ? 1 : -1;

@@ -1,6 +1,23 @@
+export const COLLECTIONS = {
+  INVENTORY_DEVICE: 'inventoryDevice',
+  INVENTORY_COMPONENT: 'inventoryComponent',
+  REFURBISHED_DEVICES: 'refurbishedDevices',
+  AMAZON_POS: 'amazonPOs',
+  RMA_ENTRIES: 'rmaEntries',
+  INBOUND_SHIPMENTS: 'inboundShipments',
+  QUOTE_APPROVED_ORDERS: 'quoteApprovedOrders',
+  SALES_DATA: 'salesData',
+  STOCK_HISTORY: 'stockHistory',
+  SHIPMENTS: 'shipments',
+  INVENTORY_TRANSACTIONS: 'inventory_transactions',
+  USERS: 'users',
+  SUPERUSERS: '_superusers',
+} as const
+
+// Schema definitions used by CsvImportModal and DataManagementView
 export const availableCollections = [
   {
-    id: 'inventoryDevice',
+    id: COLLECTIONS.INVENTORY_DEVICE,
     name: 'Inventory Device',
     schema: [
       { name: 'name', type: 'text', required: true },
@@ -13,7 +30,7 @@ export const availableCollections = [
     ],
   },
   {
-    id: 'inventoryComponent',
+    id: COLLECTIONS.INVENTORY_COMPONENT,
     name: 'Inventory Component',
     schema: [
       { name: 'name', type: 'text', required: true },
@@ -25,37 +42,37 @@ export const availableCollections = [
     ],
   },
   {
-    id: 'refurbishedDevices',
+    id: COLLECTIONS.REFURBISHED_DEVICES,
     name: 'Refurbished Devices',
     schema: [],
   },
   {
-    id: 'amazonPOs',
+    id: COLLECTIONS.AMAZON_POS,
     name: 'Amazon POs',
     schema: [],
   },
   {
-    id: 'rmaEntries',
+    id: COLLECTIONS.RMA_ENTRIES,
     name: 'RMA Entries',
     schema: [],
   },
   {
-    id: 'inboundShipments',
+    id: COLLECTIONS.INBOUND_SHIPMENTS,
     name: 'Inbound Shipments',
     schema: [],
   },
   {
-    id: 'users',
+    id: COLLECTIONS.USERS,
     name: 'Users',
     schema: [],
   },
   {
-    id: 'salesData',
+    id: COLLECTIONS.SALES_DATA,
     name: 'Sales Data',
     schema: [],
   },
   {
-    id: 'stockHistory',
+    id: COLLECTIONS.STOCK_HISTORY,
     name: 'Stock History',
     schema: [],
   },

@@ -1,18 +1,17 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { useInventory } from '../hooks/useInventory'; // Import the custom inventory hook
-import type { InventoryItem } from '../types/inventory';
+import { useDeviceInventory } from '../hooks/useInventoryModules';
+import type { DeviceItem } from '../types/device';
 
 // Define the shape of the context
 interface InventoryContextType {
-  inventory: InventoryItem[];
+  inventory: DeviceItem[];
   loading: boolean;
   error: string | null;
   refetch: (options?: { sort?: string; filter?: string }) => Promise<void>;
-  addInventoryItem: (item: Partial<InventoryItem>) => Promise<void>;
-  updateInventoryItem: (id: string, item: Partial<InventoryItem>) => Promise<void>;
+  addInventoryItem: (item: Partial<DeviceItem>) => Promise<void>;
+  updateInventoryItem: (id: string, item: Partial<DeviceItem>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
-  // fetchItemHistory: (id: string) => Promise<any>; // Assuming this returns some history data
 }
 
 // Create the Inventory Context with a default undefined value
@@ -34,16 +33,15 @@ interface InventoryProviderProps {
 }
 
 export const InventoryProvider = ({ children }: InventoryProviderProps) => {
-  // Call the useInventory custom hook to get all inventory related data and functions
   const {
-    inventory,
+    devices: inventory,
     loading,
     error,
     refetch,
-    addInventoryItem,
-    updateInventoryItem,
-    deleteInventoryItem,
-  } = useInventory();
+    addDeviceItem: addInventoryItem,
+    updateDeviceItem: updateInventoryItem,
+    deleteDeviceItem: deleteInventoryItem,
+  } = useDeviceInventory();
 
   const value = {
     inventory,

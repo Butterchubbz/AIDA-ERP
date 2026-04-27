@@ -1,13 +1,25 @@
+npm error code ENOENT
+npm error syscall open
+npm error path C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida\package.json
+npm error errno -4058
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open 'C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida\package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: C:\Users\pwalt\AppData\Local\npm-cache\_logs\2026-03-18T16_49_20_213Z-debug-0.log
 
-> aida-pb-frontend@0.1.0 start
-> npx vite --open /control-panel
+C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>'3' is not recognized as an internal or external command,
+operable program or batch file.
 
-[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>'3' is not recognized as an internal or external command,
+operable program or batch file.
 
-  [32m[1mVITE[22m v5.4.19[39m  [2mready in [0m[1m565[22m[2m[0m ms[22m
+C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>'2' is not recognized as an internal or external command,
+operable program or batch file.
 
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
-[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
-[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
-^Cnpm error A complete log of this run can be found in: C:\Users\pwalt\AppData\Local\npm-cache\_logs\2025-09-12T14_04_51_329Z-debug-0.log
-npm error A complete log of this run can be found in: C:\Users\pwalt\AppData\Local\npm-cache\_logs\2025-09-12T14_04_50_654Z-debug-0.log
+C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>'7' is not recognized as an internal or external command,
+operable program or batch file.
+
+C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>'7' is not recognized as an internal or external command,
+operable program or batch file.
+
+C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>C:\Users\pwalt\Documents\GitHub\AIDA_ERP\AIDA-ERP\aida>

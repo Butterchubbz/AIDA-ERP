@@ -1,9 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
-import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
-import { useComponentInventory } from '../hooks/useComponentInventory';
+import { useComponentInventory } from '../hooks/useInventoryModules';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
@@ -12,7 +11,7 @@ import ComponentStockCountModal from '../components/modules/ComponentStockCountM
 import PageContainer from '../components/common/PageContainer';
 import type { ComponentItem } from '../types/component';
 import type { StockCountUpdate } from '../types/stock';
-import type { HistoryRecord } from '../types/history';
+import InventoryEventLog from '../components/inventory/InventoryEventLog';
 
 // --- ComponentInventoryView Component ---
 function InventoryComponentsView() {
@@ -28,9 +27,14 @@ function InventoryComponentsView() {
   const { userRoles } = useAuth();
   const { showMessageBox, showToast } = useMessageBox();
 
+  const COMPONENT_ORDER_KEY = 'aida_component_order';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState('sku');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [orderedComponents, setOrderedComponents] = useState<ComponentItem[]>([]);
+  const [userHasSorted, setUserHasSorted] = useState(false);
+  const justDragged = React.useRef(false);
 
   // Modals
   const [showAddComponentModal, setShowAddComponentModal] = useState(false);
@@ -42,12 +46,27 @@ function InventoryComponentsView() {
   // History Modal states
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedItemHistory, setSelectedItemHistory] = useState<ComponentItem | null>(null);
-  const [itemHistoryRecords, setItemHistoryRecords] = useState<HistoryRecord[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Role-based permissions
   const canAddDeleteEdit = userRoles?.Inventory === 'Editor';
   const canCount = userRoles?.Inventory === 'Editor' || userRoles?.Inventory === 'Viewer';
+
+  useEffect(() => {
+    if (justDragged.current) {
+      justDragged.current = false;
+      return;
+    }
+    const savedOrder: string[] = JSON.parse(localStorage.getItem(COMPONENT_ORDER_KEY) || '[]');
+    if (savedOrder.length > 0) {
+      const orderMap = new Map(savedOrder.map((id, idx) => [id, idx]));
+      const sorted = [...componentInventory].sort(
+        (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+      );
+      setOrderedComponents(sorted);
+    } else {
+      setOrderedComponents([...componentInventory]);
+    }
+  }, [componentInventory]);
 
   // Remove noisy debug logs in production; keep effect for future debugging if needed
   // useEffect(() => {
@@ -61,6 +80,7 @@ function InventoryComponentsView() {
   };
 
   const handleSort = (column: string) => {
+    setUserHasSorted(true);
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -69,16 +89,64 @@ function InventoryComponentsView() {
     }
   };
 
-  const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-    // Placeholder: no state updated here. Implement reorder persistence if needed.
-  };
+  const onDragStart = useCallback(() => {
+    justDragged.current = true;
+  }, []);
+
+  const onDragEnd = useCallback(
+    (result: DropResult) => {
+      const { source, destination } = result;
+      if (!destination || destination.index === source.index) {
+        justDragged.current = false;
+        return;
+      }
+      if (source.droppableId !== destination.droppableId) {
+        justDragged.current = false;
+        return;
+      }
+
+      const [categoryName, ...rest] = source.droppableId.split('-');
+      const subcategoryName = rest.join('-');
+
+      const inGroup = orderedComponents.filter(item => {
+        const category = item.category || 'Uncategorized';
+        const subcategory = item.subcategory || 'General';
+        return category === categoryName && subcategory === subcategoryName;
+      });
+
+      const reorderedGroup = [...inGroup];
+      const [moved] = reorderedGroup.splice(source.index, 1);
+      reorderedGroup.splice(destination.index, 0, moved);
+
+      let groupIdx = 0;
+      const reorderedAll = orderedComponents.map(item => {
+        const category = item.category || 'Uncategorized';
+        const subcategory = item.subcategory || 'General';
+        if (category === categoryName && subcategory === subcategoryName) {
+          const next = reorderedGroup[groupIdx];
+          groupIdx += 1;
+          return next;
+        }
+        return item;
+      });
+
+      localStorage.setItem(COMPONENT_ORDER_KEY, JSON.stringify(reorderedAll.map(i => i.id)));
+      setOrderedComponents(reorderedAll);
+      if (userHasSorted) setUserHasSorted(false);
+      justDragged.current = false;
+    },
+    [orderedComponents, userHasSorted]
+  );
+
+  const handleResetOrder = useCallback(() => {
+    setUserHasSorted(false);
+    localStorage.removeItem(COMPONENT_ORDER_KEY);
+    setOrderedComponents([...componentInventory]);
+  }, [componentInventory]);
 
   // Filter and Sort component inventory
   const groupedAndSortedInventory = useMemo(() => {
-    const currentInventory = [...componentInventory];
-
-    const filteredItems = currentInventory.filter(
+    const filteredItems = orderedComponents.filter(
       item =>
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.sku?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -111,8 +179,10 @@ function InventoryComponentsView() {
           .sort()
           .map(subcategoryName => {
             const items = subcategories[subcategoryName];
-            // Sort items within the subcategory by the user-selected column
-            items.sort((a: ComponentItem, b: ComponentItem) => {
+            if (!userHasSorted) {
+              return { subcategoryName, items };
+            }
+            const sortedItems = [...items].sort((a: ComponentItem, b: ComponentItem) => {
               const aValue = a[sortColumn as keyof ComponentItem];
               const bValue = b[sortColumn as keyof ComponentItem];
 
@@ -129,11 +199,23 @@ function InventoryComponentsView() {
               if (result !== 0) return result;
               return naturalSort(a.sku, b.sku, 'asc'); // Secondary sort by SKU
             });
-            return { subcategoryName, items };
+            return { subcategoryName, items: sortedItems };
           });
         return { categoryName, subcategories: sortedSubcategories };
       });
-  }, [componentInventory, searchTerm, sortColumn, sortDirection]);
+  }, [orderedComponents, searchTerm, sortColumn, sortDirection, userHasSorted]);
+
+  const flatGroupedInventory = useMemo(() => {
+    const flat: ComponentItem[] = [];
+    for (const category of groupedAndSortedInventory) {
+      for (const sub of category.subcategories) {
+        for (const item of sub.items) {
+          flat.push(item);
+        }
+      }
+    }
+    return flat;
+  }, [groupedAndSortedInventory]);
 
   // --- Component CRUD Handlers ---
   const handleAddOrUpdateComponent = async (data: ComponentItem) => {
@@ -154,7 +236,7 @@ function InventoryComponentsView() {
     };
 
     if (componentToEdit) {
-      await updateComponent(componentToEdit.id!, payload);
+      await updateComponent(componentToEdit.id, payload);
       showToast('Component updated successfully!', 'success');
     } else {
       await addComponent(payload);
@@ -177,7 +259,7 @@ function InventoryComponentsView() {
       true
     );
     if (confirmed) {
-      await deleteComponent(component.id!);
+      await deleteComponent(component.id);
       showToast('Component deleted successfully!', 'success');
     }
   };
@@ -211,29 +293,14 @@ function InventoryComponentsView() {
   };
 
   // --- History Modal Logic ---
-  const openHistoryModal = async (item: ComponentItem) => {
-    setHistoryLoading(true);
+  const openHistoryModal = (item: ComponentItem) => {
     setSelectedItemHistory(item);
-    setItemHistoryRecords([]);
     setShowHistoryModal(true);
-    try {
-      // const history = await fetchComponentHistory(item.id); // Uncomment when fetchComponentHistory is available
-      const history: HistoryRecord[] = []; // Placeholder
-      setItemHistoryRecords(history as unknown as HistoryRecord[]);
-      showToast('History fetching is not yet implemented.', 'info');
-    } catch (e) {
-      console.error('Error fetching component history:', e);
-      showToast('Failed to load component history.', 'error');
-      setItemHistoryRecords([]);
-    } finally {
-      setHistoryLoading(false);
-    }
   };
 
   const closeHistoryModal = () => {
     setShowHistoryModal(false);
     setSelectedItemHistory(null);
-    setItemHistoryRecords([]);
   };
 
   if (loadingComponents) {
@@ -253,7 +320,7 @@ function InventoryComponentsView() {
   }
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <PageContainer title="Component List" icon="fas fa-microchip">
         {canCount && (
           <div className="flex justify-start mb-6">
@@ -264,6 +331,14 @@ function InventoryComponentsView() {
             >
               <i className="fas fa-clipboard-check mr-2"></i>
               Count Stock
+            </button>
+            <button
+              onClick={handleResetOrder}
+              className="inline-flex items-center px-4 py-2 ml-3 border border-slate-500 text-base font-bold rounded-md shadow-sm text-slate-100 bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+              title="Reset custom drag order"
+            >
+              <i className="fas fa-rotate-left mr-2"></i>
+              Reset Order
             </button>
           </div>
         )}
@@ -331,7 +406,7 @@ function InventoryComponentsView() {
                   {subcategories.map(({ subcategoryName, items }) => (
                     <Droppable
                       key={`${categoryName}-${subcategoryName}`}
-                      droppableId={`components-${categoryName}-${subcategoryName}`}
+                      droppableId={`${categoryName}-${subcategoryName}`}
                     >
                       {provided => (
                         <tbody
@@ -351,8 +426,8 @@ function InventoryComponentsView() {
                             const highlightRow = item.onlineStock > item.countedStock;
                             return (
                               <Draggable
-                                key={item.id ?? `item-${index}`}
-                                draggableId={String(item.id ?? `item-${index}`)}
+                                key={item.id}
+                                draggableId={String(item.id)}
                                 index={index}
                               >
                                 {prov => (
@@ -450,98 +525,21 @@ function InventoryComponentsView() {
         <ComponentStockCountModal
           isOpen={showCountModal}
           onClose={() => setShowCountModal(false)}
-          items={componentInventory.filter(
-            (item): item is ComponentItem & { id: string } => typeof item.id === 'string'
-          )}
+          items={flatGroupedInventory}
+          groupedItems={groupedAndSortedInventory}
           onSubmit={handleSaveComponentCounts}
           itemType="component"
           isSubmitting={isCounting}
         />
 
         {/* History Modal */}
-        {showHistoryModal &&
-          selectedItemHistory &&
-          createPortal(
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 overflow-y-auto">
-              <div className="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-screen-lg transform transition-all scale-100 opacity-100 my-8 text-slate-100">
-                <h3 className="text-lg font-bold mb-4 text-cyan-400">
-                  Stock History for "{selectedItemHistory.name}"
-                </h3>
-                {historyLoading ? (
-                  <p className="text-center py-4 text-slate-400">Loading history...</p>
-                ) : itemHistoryRecords.length === 0 ? (
-                  <p className="text-center py-4 text-slate-400">
-                    No history records found for this item.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto max-h-96">
-                    <table className="min-w-full divide-y divide-slate-700">
-                      <thead className="bg-slate-700">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            Timestamp
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            Field
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            Old Value
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            New Value
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            Change
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            Changed By
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-slate-800 divide-y divide-slate-700">
-                        {itemHistoryRecords.map((record: HistoryRecord) => (
-                          <tr key={record.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                              {record.timestamp}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                              {record.field}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                              {record.oldValue}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                              {record.newValue}
-                            </td>
-                            <td
-                              className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
-                                record.change < 0 ? 'text-red-400' : 'text-emerald-400'
-                              }`}
-                            >
-                              {record.change > 0 ? '+' : ''}
-                              {record.change}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                              {record.changedByEmail}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                <div className="flex justify-end mt-6">
-                  <button
-                    onClick={closeHistoryModal}
-                    className="px-4 py-2 rounded-md border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>, // First argument of createPortal ends here.
-            document.body // Second argument of createPortal
-          )}
+        {showHistoryModal && selectedItemHistory && (
+          <InventoryEventLog
+            itemId={selectedItemHistory.id}
+            itemName={selectedItemHistory.name}
+            onClose={closeHistoryModal}
+          />
+        )}
       </PageContainer>
     </DragDropContext>
   );

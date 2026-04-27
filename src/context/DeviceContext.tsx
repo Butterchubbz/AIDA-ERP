@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { useDevice } from '../hooks/useDevice'; // Import the custom inventory hook
+import { useDeviceInventory } from '../hooks/useInventoryModules';
 import type { DeviceItem } from '../types/device';
 
 // Define the shape of the context
@@ -34,9 +34,8 @@ interface DeviceProviderProps {
 }
 
 export const DeviceProvider = ({ children }: DeviceProviderProps) => {
-  // Call the useInventory custom hook to get all inventory related data and functions
   const { devices, loading, error, refetch, addDeviceItem, updateDeviceItem, deleteDeviceItem } =
-    useDevice();
+    useDeviceInventory();
 
   const value = {
     devices,

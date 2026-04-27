@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useAmazonPOs } from '../hooks/useAmazonPOs';
+import { useAmazonPOs } from '../hooks/useShippingModules';
 import { useAuth } from '../context/AuthContext';
 import AmazonPOForm from '../components/modules/AmazonPOForm';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useMessageBox } from '../components/common/MessageBox';
 import type { AmazonPO, AmazonPOItem } from '../types/amazon';
+import amazonLogo from '../assets/logos/generic-amazon.svg';
 
 const AmazonProcessingView = () => {
   const {
@@ -104,8 +105,9 @@ const AmazonProcessingView = () => {
   return (
     <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
       <div className="flex justify-between items-center mb-6 border-b pb-3">
-        <h2 className="text-2xl font-semibold text-cyan-400">
-          <i className="fas fa-cogs text-yellow-400 mr-2"></i>Amazon - Processing POs
+        <h2 className="text-2xl font-semibold text-cyan-400 flex items-center gap-2">
+          <img src={amazonLogo} alt="Amazon logo" className="w-7 h-7 object-contain" />
+          Amazon - Processing POs
         </h2>
         {canEdit && (
           <button

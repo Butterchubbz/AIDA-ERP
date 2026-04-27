@@ -3,6 +3,7 @@ import LazyRecharts from '../components/common/LazyRecharts';
 import { useAuth } from '../context/AuthContext';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import forecastLogo from '../assets/logos/generic-forecast.svg';
 
 // --- Helper Functions for Forecasting (kept local as they are specific to this component) ---
 
@@ -272,8 +273,9 @@ function ManualForecastingView() {
     <div className="bg-slate-900 text-white min-h-full font-sans p-4 sm:p-6 lg:p-8 rounded-xl shadow-lg">
       <div className="max-w-7xl mx-auto">
         <div className="border-b border-slate-700 pb-3 mb-6">
-          <h2 className="text-2xl font-semibold text-cyan-400">
-            <i className="fas fa-calculator text-green-400 mr-2"></i>Manual Sales Forecasting
+          <h2 className="text-2xl font-semibold text-cyan-400 flex items-center gap-2">
+            <img src={forecastLogo} alt="Forecast logo" className="w-7 h-7 object-contain" />
+            Manual Sales Forecasting
           </h2>
         </div>
         <p className="text-slate-400 mb-8">

@@ -4,11 +4,15 @@ export interface DeviceItem {
   id: string;
   name: string;
   sku: string;
-  onlineStock: number;
-  productionStock: number;
+  barcode?: string;
+  webStock: number;
   warehouseStock: number;
+  productionStock: number;
   reserveStock: number;
-  quantity: number;
+  onlineStock: number;
   location?: string;
+  quantity?: number;
   countedStock?: number;
+  created?: string;
+  updated?: string;
 }

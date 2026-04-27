@@ -1,7 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 
 const ProfileView = () => {
-  const { user, userRoles } = useAuth(); // Changed from currentUser to user, and userRole to userRoles
+  const { user, userRoles } = useAuth();
 
   if (!user) {
     return <p>Loading profile...</p>;
@@ -9,9 +9,7 @@ const ProfileView = () => {
 
   return (
     <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3">
-        <i className="fas fa-user-circle text-blue-400 mr-2"></i>My Profile
-      </h2>
+      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3">My Profile</h2>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-400">Email</label>
@@ -19,7 +17,6 @@ const ProfileView = () => {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-400">Role</label>
-          {/* Displaying the primary role from userRoles object, or a summary */}
           <p className="text-lg font-bold text-emerald-400">
             {userRoles?.Admin || userRoles?.Inventory || 'N/A'}
           </p>

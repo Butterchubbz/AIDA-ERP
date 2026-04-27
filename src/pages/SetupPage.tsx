@@ -11,7 +11,9 @@ export default function SetupPage() {
   // The automated helpers and import JSON were removed from the repository.
   // This page now provides manual instructions for creating PocketBase collections.
   const createCollectionsViaAdmin = async () => {
+    localStorage.setItem('aida_setup_complete', '1');
     appendLog('Automatic collection creation is not available. Please follow the manual guide.');
+    appendLog('Setup marked as complete for this browser.');
   };
 
   return (

@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDeviceContext } from '../context/DeviceContext';
 import { useAuth } from '../context/AuthContext';
 import { useMessageBox } from '../components/common/MessageBox';
 import DeviceStockCountModal from '../components/modules/DeviceStockCountModal';
 import type { StockCountUpdate } from '../types/stock';
-import type { HistoryRecord } from '../types/history';
 import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 import type { DeviceItem } from '../types/device';
+import InventoryEventLog from '../components/inventory/InventoryEventLog';
 
 // --- DeviceList Component ---
 interface DeviceListProps {
@@ -21,6 +21,8 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
   const { userRoles } = useAuth();
   const { showMessageBox, showToast } = useMessageBox();
 
+  const DEVICE_ORDER_KEY = 'aida_device_order';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [showCountModal, setShowCountModal] = useState(false);
   const [isCounting, setIsCounting] = useState(false);
@@ -28,11 +30,30 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedItemHistory, setSelectedItemHistory] = useState<DeviceItem | null>(null);
-  const [itemHistoryRecords, setItemHistoryRecords] = useState<HistoryRecord[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [orderedDevices, setOrderedDevices] = useState<DeviceItem[]>([]);
+  const [userHasSorted, setUserHasSorted] = useState(false);
+  const justDragged = React.useRef(false);
   const canAddDeleteEdit = userRoles?.Inventory === 'Editor';
 
+  useEffect(() => {
+    if (justDragged.current) {
+      justDragged.current = false;
+      return;
+    }
+    const savedOrder: string[] = JSON.parse(localStorage.getItem(DEVICE_ORDER_KEY) || '[]');
+    if (savedOrder.length > 0) {
+      const orderMap = new Map(savedOrder.map((id, idx) => [id, idx]));
+      const sorted = [...devices].sort(
+        (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+      );
+      setOrderedDevices(sorted);
+    } else {
+      setOrderedDevices([...devices]);
+    }
+  }, [devices]);
+
   const handleSort = (column: string) => {
+    setUserHasSorted(true);
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -41,40 +62,57 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
     }
   };
 
-  const onDragEnd = (result: { destination: { index: number } | null; source: { index: number } }) => {
-    if (!result.destination) return;
-    // ...drag logic if needed...
-  };
+  const onDragStart = useCallback(() => {
+    justDragged.current = true;
+  }, []);
 
-  const sortedDevices = useMemo(() => {
-    let currentInventory = [...devices];
-    currentInventory = currentInventory.filter(
+  const onDragEnd = useCallback(
+    (result: DropResult) => {
+      if (!result.destination || result.destination.index === result.source.index) {
+        justDragged.current = false;
+        return;
+      }
+      const reordered = [...orderedDevices];
+      const [moved] = reordered.splice(result.source.index, 1);
+      reordered.splice(result.destination.index, 0, moved);
+      localStorage.setItem(DEVICE_ORDER_KEY, JSON.stringify(reordered.map(d => d.id)));
+      setOrderedDevices(reordered);
+      if (userHasSorted) setUserHasSorted(false);
+      justDragged.current = false;
+    },
+    [orderedDevices, userHasSorted]
+  );
+
+  const handleResetOrder = useCallback(() => {
+    setUserHasSorted(false);
+    localStorage.removeItem(DEVICE_ORDER_KEY);
+    setOrderedDevices([...devices]);
+  }, [devices]);
+
+  const displayDevices = useMemo(() => {
+    const filtered = orderedDevices.filter(
       item =>
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.sku?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    if (sortColumn) {
-      currentInventory.sort((a, b) => {
-        const aValue = a[sortColumn as keyof DeviceItem];
-        const bValue = b[sortColumn as keyof DeviceItem];
-        if (
-          ['onlineStock', 'productionStock', 'warehouseStock', 'reserveStock'].includes(sortColumn)
-        ) {
-          const numA = parseFloat(aValue as string) || 0;
-          const numB = parseFloat(bValue as string) || 0;
-          if (numA < numB) return sortDirection === 'asc' ? -1 : 1;
-          if (numA > numB) return sortDirection === 'asc' ? 1 : -1;
-        }
-        const result = naturalSort(aValue, bValue, sortDirection);
-        if (result !== 0) return result;
-        if (sortColumn !== 'name') {
-          return naturalSort(a.name, b.name, 'asc');
-        }
-        return 0;
-      });
-    }
-    return currentInventory;
-  }, [devices, searchTerm, sortColumn, sortDirection]);
+    if (!userHasSorted) return filtered;
+    return [...filtered].sort((a, b) => {
+      const aValue = a[sortColumn as keyof DeviceItem];
+      const bValue = b[sortColumn as keyof DeviceItem];
+      if (['onlineStock', 'productionStock', 'warehouseStock', 'reserveStock'].includes(sortColumn)) {
+        const numA = parseFloat(String(aValue)) || 0;
+        const numB = parseFloat(String(bValue)) || 0;
+        if (numA < numB) return sortDirection === 'asc' ? -1 : 1;
+        if (numA > numB) return sortDirection === 'asc' ? 1 : -1;
+      }
+      const result = naturalSort(aValue, bValue, sortDirection);
+      if (result !== 0) return result;
+      if (sortColumn !== 'name') {
+        return naturalSort(a.name, b.name, 'asc');
+      }
+      return 0;
+    });
+  }, [orderedDevices, searchTerm, sortColumn, sortDirection, userHasSorted]);
 
   const handleDeleteClick = async (itemId: string, itemName: string) => {
     if (!canAddDeleteEdit) {
@@ -113,18 +151,15 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
     }
   };
 
-  const openHistoryModal = async (item: DeviceItem) => {
-    setHistoryLoading(true);
+  const openHistoryModal = (item: DeviceItem) => {
     setSelectedItemHistory(item);
-    // Placeholder: initialize history records (fetching not implemented yet)
-    setItemHistoryRecords([]);
     setShowHistoryModal(true);
   };
 
   const closeHistoryModal = () => setShowHistoryModal(false);
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="mb-4">
         {canAddDeleteEdit && (
           <div className="flex justify-start mb-6">
@@ -135,6 +170,14 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
             >
               <i className="fas fa-clipboard-check mr-2"></i>
               Count Stock
+            </button>
+            <button
+              onClick={handleResetOrder}
+              className="inline-flex items-center px-4 py-2 ml-3 border border-slate-500 text-base font-bold rounded-md shadow-sm text-slate-100 bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+              title="Reset custom drag order"
+            >
+              <i className="fas fa-rotate-left mr-2"></i>
+              Reset Order
             </button>
           </div>
         )}
@@ -189,7 +232,7 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
                 ref={provided.innerRef}
                 className="bg-slate-900 divide-y divide-slate-800"
               >
-                {sortedDevices.map((item, index) => {
+                {displayDevices.map((item, index) => {
                   const countedStock = (item.productionStock || 0) + (item.warehouseStock || 0);
                   const highlightRow = item.onlineStock > countedStock;
                   return (
@@ -258,7 +301,7 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
       <DeviceStockCountModal
         isOpen={showCountModal}
         onClose={() => setShowCountModal(false)}
-        items={sortedDevices}
+        items={displayDevices}
         onSubmit={handleSaveDeviceCounts}
         itemType="device"
         isSubmitting={isCounting}
@@ -272,89 +315,13 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
           <i className="fas fa-plus text-2xl"></i>
         </button>
       )}
-      {showHistoryModal &&
-        selectedItemHistory &&
-        createPortal(
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-screen-lg transform transition-all scale-100 opacity-100 my-8 text-slate-100">
-              <h3 className="text-lg font-bold mb-4 text-cyan-400">
-                Stock History for "{selectedItemHistory?.name}"
-              </h3>
-              {historyLoading ? (
-                <p className="text-center py-4 text-slate-400">Loading history...</p>
-              ) : itemHistoryRecords.length === 0 ? (
-                <p className="text-center py-4 text-slate-400">
-                  No history records found for this item.
-                </p>
-              ) : (
-                <div className="overflow-x-auto max-h-96">
-                  <table className="min-w-full divide-y divide-slate-700">
-                    <thead className="bg-slate-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                          Timestamp
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                          Field
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                          Old Value
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                          New Value
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                          Change
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                          Changed By
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-slate-800 divide-y divide-slate-700">
-                      {itemHistoryRecords.map(record => (
-                        <tr key={record.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                            {record.timestamp}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                            {record.field}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                            {record.oldValue}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                            {record.newValue}
-                          </td>
-                          <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
-                              record.change < 0 ? 'text-red-400' : 'text-emerald-400'
-                            }`}
-                          >
-                            {record.change > 0 ? '+' : ''}
-                            {record.change}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                            {record.changedByEmail}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <div className="flex justify-end mt-6">
-                <button
-                  onClick={closeHistoryModal}
-                  className="px-4 py-2 rounded-md border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {showHistoryModal && selectedItemHistory && (
+        <InventoryEventLog
+          itemId={selectedItemHistory.id}
+          itemName={selectedItemHistory.name}
+          onClose={closeHistoryModal}
+        />
+      )}
     </DragDropContext>
   );
 };

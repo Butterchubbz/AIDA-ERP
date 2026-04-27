@@ -1,590 +1,654 @@
-import { useState, useMemo, useEffect } from 'react';
-import LazyRecharts from '../components/common/LazyRecharts';
-import { useInventoryContext } from '../context/InventoryContext';
-import type { DeviceItem } from '../types/device';
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import PageContainer from '../components/common/PageContainer'
+import LoadingSpinner from '../components/common/LoadingSpinner'
+import StatusBadge from '../components/common/StatusBadge'
+import { useForecasting, type ForecastItem } from '../hooks/useForecasting'
 
-type SalesRecord = {
-  sku: string;
-  year: number;
-  week: number;
-  netSales: number;
-};
-import { useMessageBox } from '../components/common/MessageBox';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import { useAuth } from '../context/AuthContext';
-import { simpleLinearRegression } from '../utils/forecasting';
-import { pb } from '../lib/pocketbase'; // Import PocketBase instance
-import PageContainer from '../components/common/PageContainer';
+type ViewTab = 'table' | 'grouped' | 'discrepancies'
 
-// --- DeviceForecastingView Component ---
-function DeviceForecastingView() {
-  const { inventory, loading, error } = useInventoryContext();
-  const { user, loadingAuth } = useAuth();
-  const { showToast } = useMessageBox();
+function sourceBadgeClass(source: ForecastItem['velocitySource']) {
+  if (source === 'sales') return 'bg-slate-600 text-slate-200'
+  if (source === 'inventory') return 'bg-blue-800 text-blue-200'
+  return 'bg-cyan-800 text-cyan-200'
+}
 
-  const [selectedForecastItem, setSelectedForecastItem] = useState<DeviceItem | null>(null);
-  type ForecastResult = {
-    productName: string;
-    sku: string;
-    salesData: { week: number; weekLabel: string; sales: number }[];
-    forecastData: { week: number; weekLabel: string; Forecast: number }[];
-    avgWeeklySales: string;
-    reorderPoint: number;
-    currentStock: number;
-    recommendedOrderQty: number;
-  };
-  type ChartPoint = {
-    week: number;
-    weekLabel?: string;
-  } & Record<string, number | string | undefined>;
-  const [forecastAnalysis, setForecastAnalysis] = useState<{
-    product: string;
-    chartData: ChartPoint[];
-    individualSkuForecasts: Record<string, ForecastResult>;
-  } | null>(null);
-  const [forecastWeeks, setForecastWeeks] = useState(12); // Default to forecast next 12 weeks
-  const [historyWeeksForForecast, setHistoryWeeksForForecast] = useState(12); // Default to use past 12 weeks
+function sourceBadgeLabel(source: ForecastItem['velocitySource']) {
+  if (source === 'sales') return 'S'
+  if (source === 'inventory') return 'I'
+  return 'C'
+}
 
-  // States for re-order point calculation
-  const [leadTimeWeeks, setLeadTimeWeeks] = useState(9);
-  const [safetyStockPercentage, setSafetyStockPercentage] = useState(0.15); // Default to 15% safety stock
-  const [reorderMethod, setReorderMethod] = useState('calculated'); // 'calculated' or 'manual'
-  const [manualReorderPoint, setManualReorderPoint] = useState(100);
-  const [isForecasting, setIsForecasting] = useState(false);
+function depletionText(weeksRemaining: number | null) {
+  if (weeksRemaining === null) return '∞'
+  return `${Math.ceil(weeksRemaining)}w`
+}
 
-  useEffect(() => {
-    // Initial forecast generation or data loading can be triggered here
-    // For now, we'll rely on user interaction to trigger handleForecastItem
-  }, []);
+function depletionClass(weeksRemaining: number | null) {
+  if (weeksRemaining === null) return 'text-slate-400'
+  if (weeksRemaining < 2) return 'text-red-400 font-semibold'
+  if (weeksRemaining <= 4) return 'text-amber-300'
+  return 'text-emerald-300'
+}
 
-  // Permissions
-  const canView = !!user;
+function TrendArrow({ trend }: { trend: ForecastItem['trend'] }) {
+  if (trend === 'up') return <span className="text-emerald-400 font-bold">↑</span>
+  if (trend === 'down') return <span className="text-red-400 font-bold">↓</span>
+  return <span className="text-slate-400">→</span>
+}
 
-  // Memoized list of inventory items for the dropdown
-  const inventoryOptions = useMemo(() => {
-    return inventory.map((item: DeviceItem) => ({
-      id: item.id,
-      name: item.name,
-      sku: item.sku,
-      onlineStock: item.onlineStock, // Need onlineStock for forecasting calculation
-    }));
-  }, [inventory]);
+function confidenceBadgeClass(confidence: ForecastItem['confidence']) {
+  if (confidence === 'high') return 'bg-emerald-900/40 text-emerald-300'
+  if (confidence === 'medium') return 'bg-amber-900/40 text-amber-300'
+  if (confidence === 'low') return 'bg-slate-700 text-slate-300'
+  return 'bg-slate-800 text-slate-500'
+}
 
-  const colors = [
-    '#8884d8',
-    '#82ca9d',
-    '#ffc658',
-    '#ff7300',
-    '#0088fe',
-    '#00c49f',
-    '#ffbb28',
-    '#a4de6c',
-    '#d0ed57',
-    '#83a6ed',
-    '#8dd1e1',
-    '#82ca9d',
-    '#a4de6c',
-    '#d0ed57',
-    '#ffc658',
-    '#ff7300',
-    '#0088fe',
-    '#00c49f',
-    '#ffbb28',
-    '#a4de6c',
-  ];
+function statusTone(status: ForecastItem['status']): 'danger' | 'warning' | 'neutral' {
+  if (status === 'CRITICAL') return 'danger'
+  if (status === 'WARNING') return 'warning'
+  return 'neutral'
+}
 
-  // Forecasting Logic
-  const handleForecastItem = async () => {
-    if (!canView) {
-      showToast('Permission denied. You must be logged in to use this tool.', 'error');
-      return;
+const VENDOR_BADGE_CLASSES = [
+  'bg-violet-800/60 text-violet-200',
+  'bg-indigo-800/60 text-indigo-200',
+  'bg-cyan-800/60 text-cyan-200',
+  'bg-emerald-800/60 text-emerald-200',
+  'bg-rose-800/60 text-rose-200',
+  'bg-amber-800/60 text-amber-200',
+]
+
+function vendorBadgeClass(vendorKey: string) {
+  const hash = [...vendorKey].reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+  return VENDOR_BADGE_CLASSES[hash % VENDOR_BADGE_CLASSES.length]
+}
+
+function miniBarColor(stock: number, reorderPoint: number) {
+  if (stock < reorderPoint) return '#ef4444'
+  if (stock <= reorderPoint * 1.5) return '#f59e0b'
+  return '#10b981'
+}
+
+function discrepancyCause(item: ForecastItem): string {
+  if (item.inventoryVelocity === null) return 'No stock history for this SKU'
+  if (item.salesVelocity === null) return 'No sales data for this SKU'
+  if (item.salesVelocity > item.inventoryVelocity * 1.2) return 'Possible unrecorded stock adjustment'
+  if (item.inventoryVelocity > item.salesVelocity * 1.2) return 'Possible unrecorded sales or stock loss'
+  return 'Mixed movement patterns'
+}
+
+export default function DeviceForecastingView() {
+  const {
+    forecastItems,
+    loading,
+    error,
+    forecastWindow,
+    setForecastWindow,
+    acceptSignal,
+    clearSignal,
+  } = useForecasting({ mode: 'device' })
+
+  const [tab, setTab] = useState<ViewTab>('table')
+  const [selectedSku, setSelectedSku] = useState<string | null>(null)
+
+  const selectedItem = useMemo(() => {
+    if (!forecastItems.length) return null
+    if (!selectedSku) return forecastItems[0]
+    return forecastItems.find(item => item.sku === selectedSku) ?? forecastItems[0]
+  }, [forecastItems, selectedSku])
+
+  const summary = useMemo(() => {
+    const critical = forecastItems.filter(item => item.status === 'CRITICAL')
+    const warning = forecastItems.filter(item => item.status === 'WARNING')
+    const avgVelocity =
+      forecastItems.length > 0
+        ? forecastItems.reduce((sum, item) => sum + item.velocityPerWeek, 0) / forecastItems.length
+        : 0
+    const fastest =
+      [...forecastItems].sort((a, b) => b.velocityPerWeek - a.velocityPerWeek)[0] ?? null
+    return { critical, warning, avgVelocity, fastest, riskCount: critical.length + warning.length }
+  }, [forecastItems])
+
+  const vendorGroups = useMemo(() => {
+    const grouped = new Map<string, { vendorName: string; items: ForecastItem[]; isUnassigned: boolean }>()
+    for (const item of forecastItems) {
+      if (item.vendorKeys.length === 0) {
+        const key = '__unassigned__'
+        if (!grouped.has(key)) {
+          grouped.set(key, { vendorName: 'Unassigned', items: [], isUnassigned: true })
+        }
+        grouped.get(key)!.items.push(item)
+        continue
+      }
+
+      item.vendorKeys.forEach((vendorKey, index) => {
+        if (!grouped.has(vendorKey)) {
+          grouped.set(vendorKey, {
+            vendorName: item.vendorNames[index] ?? vendorKey,
+            items: [],
+            isUnassigned: false,
+          })
+        }
+        grouped.get(vendorKey)!.items.push(item)
+      })
     }
-
-    setIsForecasting(true);
-    setForecastAnalysis(null); // Clear previous analysis
-
-    try {
-      // Fetch all sales data from PocketBase 'salesData' collection
-      // Assuming 'salesData' collection has fields: 'sku', 'year', 'week', 'netSales'
-      const allSalesRecords = (await pb.collection('salesData').getFullList({
-        sort: 'sku,year,week', // Order by SKU, then year, then week
-      })) as unknown as SalesRecord[];
-
-      const skusToForecast = selectedForecastItem
-        ? [selectedForecastItem.sku]
-        : inventory.map((item: DeviceItem) => item.sku);
-  const forecastResults: Record<string, ForecastResult> = {};
-  const combinedChartData: ChartPoint[] = [];
-      let maxWeekIndex = 0;
-
-      let latestYear = new Date().getFullYear();
-      let latestWeek = Math.ceil(
-        (new Date().valueOf() - new Date(latestYear, 0, 1).valueOf()) / (86400000 * 7)
-      );
-
-      if (allSalesRecords.length > 0) {
-        // Determine the latest year and week from fetched sales records
-        const lastRecord = allSalesRecords[allSalesRecords.length - 1];
-        latestYear = lastRecord.year;
-        latestWeek = lastRecord.week;
-      }
-
-      for (const sku of skusToForecast) {
-        const item = inventory.find((i: DeviceItem) => i.sku === sku) as DeviceItem | undefined;
-        if (!item) continue; // Skip if SKU not found in inventory
-
-        const salesRecordsForSku = allSalesRecords.filter(
-          (record: SalesRecord) => record.sku === sku
-        );
-
-        const historicalSalesMap = new Map<string, number>();
-        salesRecordsForSku.forEach(record => {
-          historicalSalesMap.set(`${record.year}-${record.week}`, record.netSales);
-        });
-
-        const completeSalesData: { year: number; week: number; netSales: number }[] = [];
-        let currentYear = latestYear;
-        let currentWeek = latestWeek;
-
-        for (let i = 0; i < historyWeeksForForecast; i++) {
-          const weekKey = `${currentYear}-${currentWeek}`;
-          const sales = historicalSalesMap.get(weekKey) || 0; // Use 0 for weeks with no sales data
-          completeSalesData.unshift({ year: currentYear, week: currentWeek, netSales: sales });
-
-          currentWeek--;
-          if (currentWeek < 1) {
-            currentWeek = 52;
-            currentYear--;
-          }
+    return [...grouped.entries()]
+      .map(([vendorKey, group]) => ({
+        vendorKey,
+        vendorName: group.vendorName,
+        items: group.items,
+        isUnassigned: group.isUnassigned,
+        criticalCount: group.items.filter(i => i.status === 'CRITICAL').length,
+        avgVelocity:
+          group.items.reduce((s, i) => s + i.velocityPerWeek, 0) / Math.max(1, group.items.length),
+      }))
+      .sort((a, b) => {
+        if (a.isUnassigned !== b.isUnassigned) {
+          return a.isUnassigned ? 1 : -1
         }
-        completeSalesData.sort((a, b) => {
-          if (a.year !== b.year) return a.year - b.year;
-          return a.week - b.week;
-        });
+        return b.criticalCount - a.criticalCount || b.avgVelocity - a.avgVelocity
+      })
+  }, [forecastItems])
 
-        if (completeSalesData.length < 2) {
-          console.warn(
-            `Not enough sales data for SKU: ${sku} even after filling zero-sales weeks. Skipping forecast.`
-          );
-          continue;
-        }
+  const discrepancyItems = useMemo(
+    () => forecastItems.filter(item => item.hasDiscrepancy),
+    [forecastItems]
+  )
 
-        const salesDataForRegression = completeSalesData.map((record, index) => ({
-          week: index,
-          weekLabel: `Y${record.year}-W${record.week}`,
-          sales: record.netSales,
-        }));
+  const currentMarkerLabel = useMemo(() => {
+    if (!selectedItem) return undefined
+    const reversed = [...selectedItem.projection].reverse()
+    return reversed.find(p => p.actualSales !== null)?.label
+  }, [selectedItem])
 
-        const y_values = salesDataForRegression.map(d => d.sales);
-        const x_values = salesDataForRegression.map(d => d.week);
+  if (loading) return <LoadingSpinner />
 
-        const { slope, intercept } = simpleLinearRegression(y_values, x_values);
-
-        const lastHistoricalWeekIndex =
-          salesDataForRegression[salesDataForRegression.length - 1].week;
-        maxWeekIndex = Math.max(maxWeekIndex, lastHistoricalWeekIndex + forecastWeeks);
-
-        let cumulativeForecastSales = 0;
-        const lastRecord = completeSalesData[completeSalesData.length - 1];
-        let lastYear = lastRecord.year;
-        let lastWeek = lastRecord.week;
-
-        const forecastDataForSku: { week: number; weekLabel: string; Forecast: number }[] = [];
-        for (let i = 1; i <= forecastWeeks; i++) {
-          const next_week_index = lastHistoricalWeekIndex + i;
-          const predictedSales = Math.max(0, Math.round(slope * next_week_index + intercept));
-          cumulativeForecastSales += predictedSales;
-
-          lastWeek++;
-          if (lastWeek > 52) {
-            lastWeek = 1;
-            lastYear++;
-          }
-          forecastDataForSku.push({
-            week: next_week_index,
-            weekLabel: `Forecast Y${lastYear}-W${lastWeek}`,
-            Forecast: predictedSales,
-          });
-        }
-
-        const avgWeeklySales = forecastWeeks > 0 ? cumulativeForecastSales / forecastWeeks : 0;
-
-        let reorderPoint;
-        if (reorderMethod === 'calculated') {
-          reorderPoint = Math.round(avgWeeklySales * leadTimeWeeks * (1 + safetyStockPercentage));
-        } else {
-          reorderPoint = manualReorderPoint;
-        }
-
-        const recommendedOrderQty = Math.max(0, reorderPoint - (item.onlineStock || 0));
-
-        forecastResults[sku] = {
-          productName: item.name,
-          sku: item.sku,
-          salesData: salesDataForRegression,
-          forecastData: forecastDataForSku,
-          avgWeeklySales: avgWeeklySales.toFixed(2),
-          reorderPoint,
-          currentStock: item.onlineStock || 0,
-          recommendedOrderQty,
-        };
-      }
-
-      for (let i = 0; i <= maxWeekIndex; i++) {
-        const weekData: ChartPoint = { week: i } as ChartPoint;
-        let weekLabel = '';
-
-        for (const sku of skusToForecast) {
-          const result = forecastResults[sku];
-          if (result) {
-    const salesRecord = result.salesData.find((d: { week: number }) => d.week === i);
-    const forecastRecord = result.forecastData.find((d: { week: number }) => d.week === i);
-
-            if (salesRecord) {
-              weekData[`${sku} Sales`] = salesRecord.sales;
-              weekLabel = salesRecord.weekLabel;
-            }
-            if (forecastRecord) {
-              weekData[`${sku} Forecast`] = forecastRecord.Forecast;
-              weekLabel = forecastRecord.weekLabel;
-            }
-          }
-        }
-        if (weekLabel) {
-          // Ensure we only add weeks that have data
-          weekData.weekLabel = weekLabel;
-          combinedChartData.push(weekData);
-        }
-      }
-      combinedChartData.sort((a, b) => a.week - b.week); // Ensure chronological order
-
-      setForecastAnalysis({
-        product: selectedForecastItem ? selectedForecastItem.name : 'All Device SKUs',
-        chartData: combinedChartData,
-        individualSkuForecasts: forecastResults,
-      });
-      showToast('Forecast generated successfully!', 'success');
-    } catch (e: unknown) {
-      console.error('Error generating forecast:', e);
-      if ((e as { code?: string }).code === 'failed-precondition') {
-        showToast(
-          'A Firestore index is required for this query. Check the browser console for a link to create it.',
-          'error',
-          10000
-        );
-      } else {
-        showToast('Failed to generate forecast: ' + ((e as { message?: string }).message ?? String(e)), 'error');
-      }
-      setForecastAnalysis(null);
-    } finally {
-      setIsForecasting(false);
-    }
-  };
-
-  if (loadingAuth || loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (error) {
+  if (error)
     return (
-      <div className="text-red-400 bg-red-900/20 p-4 rounded-md text-center">
-        <p className="font-semibold mb-2">Error loading Device SKU data for forecasting:</p>
-        <p>{error}</p>
-        <p className="mt-2 text-sm">
-          Please try refreshing the page or check your internet connection.
-        </p>
+      <div className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-red-200">
+        Failed to load forecasting data: {error}
       </div>
-    );
-  }
-
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 bg-slate-800 rounded-lg shadow-xl text-slate-200 text-lg">
-        <i className="fas fa-user-lock text-6xl text-blue-500 mb-4"></i>
-        <h2 className="text-2xl font-semibold mb-2">Access Denied (AIDA)</h2>
-        <p className="text-center">Please sign in to use the Device SKU Forecasting tool.</p>
-      </div>
-    );
-  }
+    )
 
   return (
-    <>
-      <PageContainer title="Device Sales Forecasting" icon="fas fa-chart-line">
-        <p className="text-slate-400 mb-4">
-          Select a Device SKU to view its sales history and forecast future stock needs.
-        </p>
+    <PageContainer title="Device Forecasting" icon="fas fa-chart-line">
+      <div className="space-y-4">
+        {/* Alert Banner */}
+        {summary.critical.length > 0 && (
+          <div className="rounded-lg border border-red-700/50 bg-red-900/30 px-4 py-2 text-sm text-red-200">
+            ⚠ {summary.critical.length} items require immediate reorder:{' '}
+            <span className="font-medium">{summary.critical.map(i => i.name).join(', ')}</span>
+          </div>
+        )}
 
-        <div className="mb-6">
-          <label htmlFor="forecast-item-select" className="block text-slate-300 mb-2 font-medium">
-            Select Device SKU for Forecast
-          </label>
-          <select
-            id="forecast-item-select"
-            value={selectedForecastItem?.id || ''}
-            onChange={e => {
-              const item = inventory.find(i => i.id === e.target.value) as DeviceItem | undefined;
-              setSelectedForecastItem(item ?? null);
-              setForecastAnalysis(null); // Clear previous forecast when item changes
-            }}
-            className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-            aria-label="Select item for forecast"
-          >
-            <option value="" disabled>
-              -- Select a Device SKU --
-            </option>
-            {inventoryOptions.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.name} ({item.sku})
-              </option>
+        {/* Controls Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400">Velocity Window</span>
+            {([4, 8, 13] as const).map(w => (
+              <button
+                key={w}
+                onClick={() => setForecastWindow(w)}
+                className={`rounded px-3 py-1 text-sm ${
+                  forecastWindow === w
+                    ? 'bg-cyan-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {w === 4 ? '4 Weeks' : w === 8 ? '8 Weeks' : '13 Weeks'}
+              </button>
             ))}
-          </select>
+          </div>
+          <Link
+            to="/forecasting/settings"
+            className="rounded border border-slate-600 bg-slate-800 px-3 py-1 text-sm text-slate-300 hover:bg-slate-700"
+          >
+            ⚙ Vendor Settings
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="forecast-weeks-input" className="block text-slate-300 mb-2 font-medium">
-              Forecast Next (Weeks)
-            </label>
-            <input
-              type="number"
-              id="forecast-weeks-input"
-              value={forecastWeeks}
-              onChange={e => setForecastWeeks(parseInt(e.target.value, 10) || 1)}
-              min="1"
-              className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-            />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="rounded-lg border border-slate-700 bg-slate-800/70 p-4">
+            <p className="text-xs uppercase text-slate-400">Total SKUs</p>
+            <p className="mt-1 text-3xl font-semibold text-slate-100">{forecastItems.length}</p>
           </div>
-          <div>
-            <label htmlFor="history-weeks-input" className="block text-slate-300 mb-2 font-medium">
-              Use Past (Weeks of History)
-            </label>
-            <input
-              type="number"
-              id="history-weeks-input"
-              value={historyWeeksForForecast}
-              onChange={e => setHistoryWeeksForForecast(parseInt(e.target.value, 10) || 1)}
-              min="1"
-              className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-            />
+          <div className="rounded-lg border border-slate-700 bg-slate-800/70 p-4">
+            <p className="text-xs uppercase text-slate-400">Avg Velocity</p>
+            <p className="mt-1 text-3xl font-semibold text-cyan-300">
+              {summary.avgVelocity.toFixed(1)} <span className="text-sm">u/w</span>
+            </p>
           </div>
-        </div>
-
-        {/* Re-Order Point Parameters */}
-        <div className="mt-6 border-t border-slate-700 pt-6">
-          <h3 className="text-lg font-semibold text-slate-300 mb-4">Re-Order Point Parameters</h3>
-          <div className="bg-slate-700/50 p-4 rounded-lg">
-            <span className="block text-slate-300 mb-3 font-medium">Re-Order Point Method</span>
-            <div className="flex space-x-4 mb-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="reorderMethodDevice"
-                  value="calculated"
-                  checked={reorderMethod === 'calculated'}
-                  onChange={() => setReorderMethod('calculated')}
-                  className="form-radio bg-slate-600 text-cyan-500"
-                />
-                <span className="text-slate-200">Calculate Automatically</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="reorderMethodDevice"
-                  value="manual"
-                  checked={reorderMethod === 'manual'}
-                  onChange={() => setReorderMethod('manual')}
-                  className="form-radio bg-slate-600 text-cyan-500"
-                />
-                <span className="text-slate-200">Set Manually</span>
-              </label>
-            </div>
-
-            {reorderMethod === 'calculated' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="lead-time-weeks-input"
-                    className="block text-slate-300 mb-2 font-medium"
-                  >
-                    Supplier Lead Time (Weeks)
-                  </label>
-                  <input
-                    type="number"
-                    id="lead-time-weeks-input"
-                    value={leadTimeWeeks}
-                    onChange={e => setLeadTimeWeeks(parseInt(e.target.value, 10) || 0)}
-                    min="0"
-                    className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="safety-stock-weeks-input"
-                    className="block text-slate-300 mb-2 font-medium"
-                  >
-                    Safety Stock (Percentage)
-                  </label>
-                  <input
-                    type="number"
-                    id="safety-stock-percentage-input"
-                    value={safetyStockPercentage * 100}
-                    onChange={e => setSafetyStockPercentage(parseFloat(e.target.value) / 100 || 0)}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-                  />
-                </div>
-              </div>
-            )}
-
-            {reorderMethod === 'manual' && (
-              <div>
-                <label
-                  htmlFor="manual-reorder-point-input"
-                  className="block text-slate-300 mb-2 font-medium"
-                >
-                  Manual Re-Order Point (Units)
-                </label>
-                <input
-                  type="number"
-                  id="manual-reorder-point-input"
-                  value={manualReorderPoint}
-                  onChange={e => setManualReorderPoint(parseInt(e.target.value, 10) || 0)}
-                  min="0"
-                  className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-                />
-              </div>
-            )}
+          <div className="rounded-lg border border-slate-700 bg-slate-800/70 p-4">
+            <p className="text-xs uppercase text-slate-400">At Risk</p>
+            <p className="mt-1 text-3xl font-semibold text-amber-300">{summary.riskCount}</p>
+          </div>
+          <div className="rounded-lg border border-slate-700 bg-slate-800/70 p-4">
+            <p className="text-xs uppercase text-slate-400">Fastest Mover</p>
+            <p className="mt-1 truncate text-lg font-semibold text-emerald-300">
+              {summary.fastest?.name ?? 'N/A'}
+            </p>
           </div>
         </div>
 
-        <button
-          onClick={handleForecastItem}
-          disabled={isForecasting || (inventory.length === 0 && !selectedForecastItem)}
-          className="w-full mt-6 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:shadow-none"
-        >
-          {isForecasting ? 'Generating Forecast...' : 'Generate Forecast'}
-        </button>
+        {/* View Tabs */}
+        <div className="flex gap-2">
+          {(['table', 'grouped', 'discrepancies'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`rounded px-3 py-1 text-sm ${
+                tab === t ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              {t === 'table' ? 'Table View' : t === 'grouped' ? 'Grouped View' : 'Discrepancies'}
+            </button>
+          ))}
+        </div>
 
-        {forecastAnalysis && (
-          <div className="mt-8 bg-slate-700 p-6 rounded-lg shadow-inner">
-            <h3 className="text-xl font-semibold text-cyan-400 mb-4 border-b pb-2">
-              Forecast for {forecastAnalysis.product}
-            </h3>
-
-            <h4 className="text-lg font-semibold mb-3 text-slate-200">Sales History & Forecast</h4>
-            <div className="w-full h-80">
-              <LazyRecharts>
-                {(R: unknown) => {
-                  const Recharts = R as typeof import('recharts');
-                  return (
-                  <Recharts.ResponsiveContainer width="100%" height="100%">
-                    <Recharts.LineChart data={forecastAnalysis.chartData}>
-                      <Recharts.CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                      <Recharts.XAxis dataKey="weekLabel" stroke="#94a3b8" tick={{ fontSize: 12 }} />
-                      <Recharts.YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} />
-                      <Recharts.Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                          borderColor: '#475569',
-                          color: '#cbd5e1',
-                        }}
-                        labelStyle={{ color: '#f1f5f9', fontWeight: 'bold' }}
-                      />
-                      <Recharts.Legend wrapperStyle={{ color: '#e2e8f0' }} />
-                      {Object.keys(forecastAnalysis.individualSkuForecasts).map((sku, index) => (
-                        <Recharts.Line
-                          key={`${sku}-sales`}
-                          type="monotone"
-                          dataKey={`${sku} Sales`}
-                          stroke={colors[index % colors.length]}
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
-                          activeDot={{ r: 4 }}
-                          name={`${forecastAnalysis.individualSkuForecasts[sku].productName} Sales`}
-                        />
-                      ))}
-                      {Object.keys(forecastAnalysis.individualSkuForecasts).map((sku, index) => (
-                        <Recharts.Line
-                          key={`${sku}-forecast`}
-                          type="monotone"
-                          dataKey={`${sku} Forecast`}
-                          stroke={colors[index % colors.length]}
-                          strokeWidth={2}
-                          strokeDasharray="5 5"
-                          dot={{ r: 2 }}
-                          activeDot={{ r: 4 }}
-                          name={`${forecastAnalysis.individualSkuForecasts[sku].productName} Forecast`}
-                        />
-                      ))}
-                      </Recharts.LineChart>
-                    </Recharts.ResponsiveContainer>
-                    );
-                  }}
-              </LazyRecharts>
-            </div>
-
-            {selectedForecastItem ? (
-              <div className="mt-4 text-center text-slate-400 text-sm">
-                Recommendation: Order{' '}
-                <strong className="text-emerald-400">
-                  {
-                    forecastAnalysis.individualSkuForecasts[selectedForecastItem.sku]
-                      ?.recommendedOrderQty
-                  }{' '}
-                  units
-                </strong>{' '}
-                of{' '}
-                <strong className="text-white">
-                  {forecastAnalysis.individualSkuForecasts[selectedForecastItem.sku]?.productName}
-                </strong>{' '}
-                to meet the re-order point of{' '}
-                {forecastAnalysis.individualSkuForecasts[selectedForecastItem.sku]?.reorderPoint}{' '}
-                units.
-              </div>
-            ) : (
-              <div className="mt-8">
-                <h4 className="text-lg font-semibold text-slate-200 mb-3">
-                  Individual SKU Forecast Summaries
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.values(forecastAnalysis.individualSkuForecasts).map(
-                      (skuForecast: ForecastResult) => (
-                      <div
-                        key={skuForecast.sku}
-                        className="bg-slate-600/50 p-4 rounded-lg border border-slate-700"
+        {/* ── TABLE VIEW ── */}
+        {tab === 'table' && (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
+            <div className="overflow-x-auto rounded-lg border border-slate-700">
+              <table className="min-w-full divide-y divide-slate-700 text-sm">
+                <thead className="bg-slate-800">
+                  <tr>
+                    {[
+                      'Item',
+                      'Vendor',
+                      'Vel/Week',
+                      'Stock',
+                      'Depletion',
+                      'Reorder Pt',
+                      'Trend',
+                      'Conf.',
+                      'Status',
+                    ].map(h => (
+                      <th
+                        key={h}
+                        className="px-3 py-2 text-left text-xs uppercase text-slate-400"
                       >
-                        <h5 className="font-bold text-cyan-300 mb-2">
-                          {skuForecast.productName} ({skuForecast.sku})
-                        </h5>
-                        <p className="text-sm text-slate-300">
-                          Avg. Weekly Sales:{' '}
-                          <span className="font-semibold">{skuForecast.avgWeeklySales}</span>
-                        </p>
-                        <p className="text-sm text-slate-300">
-                          Current Stock:{' '}
-                          <span className="font-semibold">{skuForecast.currentStock}</span>
-                        </p>
-                        <p className="text-sm text-slate-300">
-                          Re-Order Point:{' '}
-                          <span className="font-semibold">{skuForecast.reorderPoint}</span>
-                        </p>
-                        <p className="text-sm text-emerald-300">
-                          Recommended Order:{' '}
-                          <span className="font-bold">{skuForecast.recommendedOrderQty}</span>
-                        </p>
-                      </div>
-                    )
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {forecastItems.map(item => (
+                    <tr
+                      key={item.sku}
+                      onClick={() => setSelectedSku(item.sku)}
+                      className={`cursor-pointer ${
+                        selectedItem?.sku === item.sku
+                          ? 'bg-cyan-900/20'
+                          : 'bg-slate-900/30 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <td className="px-3 py-2 font-medium text-slate-200">{item.name}</td>
+                      <td className="px-3 py-2">
+                        {item.vendorKeys.length === 0 ? (
+                          <span className="text-slate-500">—</span>
+                        ) : (
+                          <div className="inline-flex items-center gap-1">
+                            <span
+                              className={`rounded px-2 py-0.5 text-xs ${vendorBadgeClass(item.vendorKeys[0])}`}
+                            >
+                              {item.vendorNames[0] ?? item.vendorKeys[0]}
+                            </span>
+                            {item.vendorKeys.length > 1 && (
+                              <span className="rounded px-2 py-0.5 text-xs bg-slate-700 text-slate-300">
+                                +{item.vendorKeys.length - 1}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="inline-flex items-center gap-1">
+                          <span className="text-cyan-300">
+                            {item.velocityPerWeek.toFixed(1)}
+                          </span>
+                          <span
+                            className={`rounded px-1 text-[10px] ${
+                              sourceBadgeClass(item.velocitySource)
+                            }`}
+                          >
+                            {sourceBadgeLabel(item.velocitySource)}
+                          </span>
+                          {item.hasDiscrepancy && (
+                            <span
+                              className="text-xs text-amber-400"
+                              title="Sales and inventory signals diverge"
+                            >
+                              ⚠
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-slate-200">
+                        {item.currentStock}
+                        {item.inboundQty > 0 && (
+                          <span className="ml-1 text-xs text-cyan-400">+{item.inboundQty}</span>
+                        )}
+                      </td>
+                      <td className={`px-3 py-2 ${depletionClass(item.weeksRemaining)}`}>
+                        {depletionText(item.weeksRemaining)}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-xs italic text-slate-400"
+                        title={`RP = ceil(velocity × leadTimeWeeks × (1 + safetyPct))`}
+                      >
+                        {item.reorderPoint}
+                      </td>
+                      <td className="px-3 py-2">
+                        <TrendArrow trend={item.trend} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`rounded px-2 py-0.5 text-[10px] uppercase ${
+                            confidenceBadgeClass(item.confidence)
+                          }`}
+                        >
+                          {item.confidence}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <StatusBadge text={item.status} tone={statusTone(item.status)} />
+                      </td>
+                    </tr>
+                  ))}
+                  {forecastItems.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="px-3 py-8 text-center text-sm text-slate-500"
+                      >
+                        No device SKUs found. Add inventory items to get started.
+                      </td>
+                    </tr>
                   )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Detail Panel */}
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+              {selectedItem ? (
+                <>
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-100">
+                        {selectedItem.name}
+                      </h3>
+                      <p className="font-mono text-xs text-cyan-400">{selectedItem.sku}</p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded px-2 py-0.5 text-xs uppercase ${
+                        confidenceBadgeClass(selectedItem.confidence)
+                      }`}
+                    >
+                      {selectedItem.confidence}
+                    </span>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={selectedItem.projection}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis
+                          dataKey="label"
+                          stroke="#94a3b8"
+                          tick={{ fontSize: 10 }}
+                        />
+                        <YAxis stroke="#94a3b8" tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#0f172a',
+                            border: '1px solid #334155',
+                          }}
+                        />
+                        <ReferenceLine
+                          y={selectedItem.reorderPoint}
+                          stroke="#f59e0b"
+                          strokeDasharray="4 4"
+                          label={{
+                            value: `RP ${selectedItem.reorderPoint}`,
+                            fill: '#f59e0b',
+                            fontSize: 10,
+                            position: 'right',
+                          }}
+                        />
+                        <ReferenceLine
+                          x={currentMarkerLabel}
+                          stroke="#14b8a6"
+                          strokeDasharray="2 2"
+                          label={{
+                            value: 'Now',
+                            fill: '#14b8a6',
+                            fontSize: 10,
+                            position: 'insideTopRight',
+                          }}
+                        />
+                        <Bar dataKey="actualSales" name="Actual Sales" fill="#22d3ee" />
+                        <Line
+                          type="monotone"
+                          dataKey="projectedSales"
+                          name="Projected"
+                          stroke="#a3e635"
+                          strokeWidth={2}
+                          strokeDasharray="5 3"
+                          dot={false}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded bg-slate-950/70 p-3">
+                      <p className="text-xs uppercase text-slate-500">Stock on Hand</p>
+                      <p className="text-2xl font-semibold text-slate-100">
+                        {selectedItem.currentStock}
+                      </p>
+                    </div>
+                    <div className="rounded bg-slate-950/70 p-3">
+                      <p className="text-xs uppercase text-slate-500">Reorder Point</p>
+                      <p className="text-2xl font-semibold text-slate-100">
+                        {selectedItem.reorderPoint}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  Click a row to view projection details.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── GROUPED VIEW ── */}
+        {tab === 'grouped' && (
+          <div className="space-y-4">
+            {vendorGroups.map(group => {
+              const avgLead =
+                group.items.reduce((s, i) => s + i.vendorLeadTimeWeeks, 0) /
+                Math.max(1, group.items.length)
+              const avgSafety =
+                group.items.reduce((s, i) => s + i.vendorSafetyStockPct, 0) /
+                Math.max(1, group.items.length)
+              const chartData = group.items.map(i => ({
+                name: i.sku,
+                stock: i.effectiveStock,
+                reorderPoint: i.reorderPoint,
+              }))
+              return (
+                <div
+                  key={group.vendorKey}
+                  className="rounded-lg border border-slate-700 bg-slate-900/40 p-4"
+                >
+                  <div className="mb-3 flex flex-wrap items-center gap-3">
+                    <span
+                      className={`rounded px-2 py-1 text-sm font-medium ${
+                        vendorBadgeClass(group.vendorKey)
+                      }`}
+                    >
+                      {group.vendorName}
+                    </span>
+                    <span className="text-xs text-slate-400">SKUs: {group.items.length}</span>
+                    <span className="text-xs text-slate-400">
+                      Avg Vel: {group.avgVelocity.toFixed(1)} u/w
+                    </span>
+                    {group.criticalCount > 0 && (
+                      <span className="text-xs font-semibold text-red-300">
+                        Critical: {group.criticalCount}
+                      </span>
+                    )}
+                    <span className="text-xs text-slate-400">
+                      Lead: {avgLead.toFixed(1)}w
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Safety: {(avgSafety * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-48 min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={chartData}
+                        layout="vertical"
+                        margin={{ left: 10, right: 20, top: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis type="number" stroke="#94a3b8" tick={{ fontSize: 10 }} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={110}
+                          stroke="#94a3b8"
+                          tick={{ fontSize: 10 }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#0f172a',
+                            border: '1px solid #334155',
+                          }}
+                        />
+                        <Bar dataKey="stock" name="Stock" radius={[0, 4, 4, 0]}>
+                          {chartData.map(row => (
+                            <Cell
+                              key={row.name}
+                              fill={miniBarColor(row.stock, row.reorderPoint)}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
+              )
+            })}
+            {vendorGroups.length === 0 && (
+              <p className="text-center text-sm text-slate-500 py-8">
+                No vendor groups available yet.
+              </p>
             )}
           </div>
         )}
-      </PageContainer>
-    </>
-  );
-}
 
-export default DeviceForecastingView;
+        {/* ── DISCREPANCIES TAB ── */}
+        {tab === 'discrepancies' && (
+          <div className="overflow-x-auto rounded-lg border border-slate-700">
+            <table className="min-w-full divide-y divide-slate-700 text-sm">
+              <thead className="bg-slate-800">
+                <tr>
+                  {[
+                    'Item',
+                    'SKU',
+                    'Sales Vel',
+                    'Inventory Vel',
+                    'Diff %',
+                    'Likely Cause',
+                    'Action',
+                  ].map(h => (
+                    <th
+                      key={h}
+                      className="px-3 py-2 text-left text-xs uppercase text-slate-400"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {discrepancyItems.map(item => (
+                  <tr key={item.sku} className="bg-slate-900/30">
+                    <td className="px-3 py-2 text-slate-200">{item.name}</td>
+                    <td className="px-3 py-2 font-mono text-cyan-300">{item.sku}</td>
+                    <td className="px-3 py-2 text-slate-300">
+                      {item.salesVelocity?.toFixed(1) ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-slate-300">
+                      {item.inventoryVelocity?.toFixed(1) ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-amber-300">
+                      {item.discrepancyPct !== null
+                        ? `${(item.discrepancyPct * 100).toFixed(1)}%`
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-300">
+                      {discrepancyCause(item)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          onClick={() => acceptSignal(item.sku, 'sales')}
+                          className="rounded bg-cyan-700 px-2 py-1 text-xs text-white hover:bg-cyan-600"
+                        >
+                          Accept Sales
+                        </button>
+                        <button
+                          onClick={() => acceptSignal(item.sku, 'inventory')}
+                          className="rounded bg-indigo-700 px-2 py-1 text-xs text-white hover:bg-indigo-600"
+                        >
+                          Accept Inventory
+                        </button>
+                        <button
+                          onClick={() => clearSignal(item.sku)}
+                          className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-100 hover:bg-slate-600"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {discrepancyItems.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-3 py-8 text-center text-sm text-slate-500"
+                    >
+                      No discrepancies detected for the current forecast window.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </PageContainer>
+  )
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAmazonInventory } from '../hooks/useAmazonInventory';
+import { useAmazonInventory } from '../hooks/useShippingModules';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
 import MiniBarGraph from '../components/modules/MiniBarGraph';

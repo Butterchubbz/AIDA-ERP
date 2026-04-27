@@ -1,10 +1,75 @@
 import { useState, useEffect } from 'react';
-import { useInboundShipments } from '../hooks/useInboundShipments';
+import { formatLocalDateTime } from '../utils/date';
+import { useInboundShipments } from '../hooks/useShippingModules';
+import { useComponentInventory } from '../hooks/useInventoryModules';
 import { useAuth } from '../context/AuthContext';
+import { useDeviceContext } from '../context/DeviceContext';
 import type { InboundShipment as InboundShipmentType, InboundShipmentItem } from '../types/inbound';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import InboundShipmentModal from '../components/modules/InboundShipmentModal';
+
+type ChecklistField = 'customsDocsDownloaded' | 'importAgentEmailed' | 'spreadsheetsUpdated';
+type ChecklistColor = 'blue' | 'purple' | 'green';
+
+interface ChecklistItemDef {
+  field: ChecklistField;
+  label: string;
+  icon: string;
+  color: ChecklistColor;
+}
+
+function getChecklistItemClass(
+  checked: boolean,
+  color: ChecklistColor
+): { card: string; check: string; iconColor: string } {
+  const colorMap: Record<ChecklistColor, { card: string; check: string; iconColor: string }> = {
+    blue: {
+      card: 'bg-blue-900/30 border-blue-700/40',
+      check: 'bg-blue-600',
+      iconColor: 'text-blue-400',
+    },
+    purple: {
+      card: 'bg-purple-900/30 border-purple-700/40',
+      check: 'bg-purple-600',
+      iconColor: 'text-purple-400',
+    },
+    green: {
+      card: 'bg-green-900/30 border-green-700/40',
+      check: 'bg-green-600',
+      iconColor: 'text-green-400',
+    },
+  };
+  const colors = colorMap[color];
+  return {
+    card: checked
+      ? `${colors.card} border`
+      : 'bg-slate-800 border border-slate-700 hover:border-slate-600',
+    check: checked ? colors.check : 'bg-slate-700 border border-slate-600',
+    iconColor: checked ? colors.iconColor : 'text-slate-400',
+  };
+}
+
+const CHECKLIST_ITEMS: ChecklistItemDef[] = [
+  {
+    field: 'customsDocsDownloaded',
+    label: 'Customs Documents Downloaded',
+    icon: 'fas fa-file-download',
+    color: 'blue',
+  },
+  {
+    field: 'importAgentEmailed',
+    label: 'Import Agent Notified',
+    icon: 'fas fa-envelope',
+    color: 'purple',
+  },
+  {
+    field: 'spreadsheetsUpdated',
+    label: 'Records Updated',
+    icon: 'fas fa-table',
+    color: 'green',
+  },
+];
 
 // --- Main InboundShipmentView Component ---
 function InboundShipmentView() {
@@ -14,9 +79,12 @@ function InboundShipmentView() {
     addInboundShipment,
     updateInboundShipment,
     deleteInboundShipment,
+    pushShipmentToInventory,
     searchSKU,
   } = useInboundShipments();
-  const { user } = useAuth(); // Changed from currentUser to user
+  const { user, userRoles } = useAuth();
+  const { refetch: refetchDevices } = useDeviceContext();
+  const { refetch: refetchComponents } = useComponentInventory();
   const { showMessageBox, showToast } = useMessageBox();
 
   const [showAddShipmentModal, setShowAddShipmentModal] = useState(false);
@@ -24,6 +92,7 @@ function InboundShipmentView() {
   const [shipmentToEdit, setShipmentToEdit] = useState<InboundShipmentType | null>(null);
   const [showEditShipmentModal, setShowEditShipmentModal] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const statusOptions = [
     'In Transit',
@@ -32,19 +101,12 @@ function InboundShipmentView() {
     'Out for Delivery',
     'Complete',
   ];
-  const canEdit = !!user; // Changed from currentUser to user
+  const canEdit =
+    userRoles?.['Inbound Shipments'] === 'Editor' ||
+    userRoles?.Inventory === 'Editor' ||
+    !!user;
 
-  useEffect(() => {
-    inboundShipments.forEach((shipment: InboundShipmentType) => {
-      if (
-        shipment.status === 'Complete' &&
-        shipment.items &&
-        shipment.items.some((item: InboundShipmentItem) => !item.pushed)
-      ) {
-        // pushShipmentToInventory(shipment.id); // Uncomment when implemented
-      }
-    });
-  }, [inboundShipments]); // Removed pushShipmentToInventory from dependencies as it's not used directly in useEffect
+  useEffect(() => {}, [inboundShipments]);
 
   // Add shipment
   const handleAddShipment = async (shipmentData: Partial<InboundShipmentType>) => {
@@ -88,9 +150,6 @@ function InboundShipmentView() {
     setShipmentToEdit(null);
     try {
       await updateInboundShipment(updatedData.id, updatedData);
-      if (updatedData.status === 'Complete') {
-        // await pushShipmentToInventory(updatedData.id); // Uncomment when implemented
-      }
       showToast('Inbound shipment updated successfully!', 'success');
     } catch (e: unknown) {
       console.error('Error updating inbound shipment: ', e);
@@ -112,14 +171,56 @@ function InboundShipmentView() {
         // lastUpdatedBy: user.email || user.id, // Uncomment when user object has email/id
         // lastUpdatedAt: new Date() // Replace serverTimestamp with new Date()
       });
-      if (newStatus === 'Complete') {
-        // await pushShipmentToInventory(id); // Uncomment when implemented
-      }
       showToast('Shipment status updated!', 'success');
     } catch (e: unknown) {
       console.error('Error updating shipment status:', e);
       showToast('Failed to update shipment status. Please try again.', 'error');
     }
+  };
+
+  const handleReceiveShipment = async (shipmentId: string, itemCount: number) => {
+    if (!canEdit) {
+      showToast('Permission denied. You do not have access to receive shipments.', 'error');
+      return;
+    }
+
+    const confirmed = await showMessageBox(
+      'Receive Shipment',
+      `Receive this shipment and push ${itemCount} item(s) to inventory?`,
+      true
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await pushShipmentToInventory(shipmentId);
+      await Promise.all([
+        refetchDevices().catch(console.error),
+        refetchComponents().catch(console.error),
+      ]);
+
+      if (result && result.toLowerCase().startsWith('warning')) {
+        showToast(result, 'info');
+      } else {
+        showToast('Shipment received and inventory updated.', 'success');
+      }
+    } catch (e) {
+      console.error('Error receiving shipment:', e);
+      showToast('Failed to receive shipment.', 'error');
+    }
+  };
+
+  const handleCopyTracking = async (trackingNumber: string) => {
+    try {
+      await navigator.clipboard.writeText(trackingNumber);
+      showToast(`Tracking number copied: ${trackingNumber}`, 'success');
+    } catch (e) {
+      console.error('Failed to copy tracking number:', e);
+      showToast('Failed to copy tracking number.', 'error');
+    }
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   // Confirmation toggle (always pass items)
@@ -144,21 +245,6 @@ function InboundShipmentView() {
     } catch (e: unknown) {
       console.error(`Error toggling ${field}:`, e);
       showToast(`Failed to toggle ${field}.`, 'error');
-    }
-  };
-
-  // Tracking page
-  const openTrackingPage = (trackingNumber: string, shipmentType: string) => {
-    let url;
-    if (shipmentType === 'Sea Shipment') {
-      url = `https://nvogo.nvoconsolidation.com/tracker;trackingnr=${trackingNumber}`;
-    } else {
-      url = `https://www.google.com/search?q=track+package+${trackingNumber}`;
-    }
-    if (url) {
-      window.open(url, '_blank');
-    } else {
-      showToast('Tracking URL could not be determined.', 'error');
     }
   };
 
@@ -208,9 +294,7 @@ function InboundShipmentView() {
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Entered
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider"></th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   PO Number
                 </th>
@@ -226,21 +310,6 @@ function InboundShipmentView() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Customs Docs
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Agent Emailed
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Spreadsheets
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Notes
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Items
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Actions
                 </th>
@@ -248,142 +317,165 @@ function InboundShipmentView() {
             </thead>
             <tbody className="bg-slate-800 divide-y divide-slate-700">
               {shipments.map((shipment: InboundShipmentType) => (
-                <tr key={shipment.id} className="hover:bg-slate-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                    {shipment.timestamp}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
-                    {shipment.poNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                    {shipment.trackingNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                    {shipment.vendor}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                    {shipment.shipmentType || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <select
-                      value={shipment.status}
-                      onChange={e => handleStatusChange(String(shipment.id ?? ''), e.target.value)}
-                      disabled={!canEdit}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 text-sm py-1 bg-slate-900 text-slate-100"
-                    >
-                      {statusOptions.map(option => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                    <input
-                      type="checkbox"
-                      checked={shipment.customsDocsDownloaded || false}
-                      onChange={() =>
-                        handleConfirmationToggle(
-                          String(shipment.id ?? ''),
-                          'customsDocsDownloaded',
-                          Boolean(shipment.customsDocsDownloaded),
-                          shipment.items || []
-                        )
-                      }
-                      disabled={!canEdit}
-                      className="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                    <input
-                      type="checkbox"
-                      checked={shipment.importAgentEmailed || false}
-                      onChange={() =>
-                        handleConfirmationToggle(
-                          String(shipment.id ?? ''),
-                          'importAgentEmailed',
-                          Boolean(shipment.importAgentEmailed),
-                          shipment.items || []
-                        )
-                      }
-                      disabled={!canEdit}
-                      className="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                    <input
-                      type="checkbox"
-                      checked={shipment.spreadsheetsUpdated || false}
-                      onChange={() =>
-                        handleConfirmationToggle(
-                          String(shipment.id ?? ''),
-                          'spreadsheetsUpdated',
-                          Boolean(shipment.spreadsheetsUpdated),
-                          shipment.items || []
-                        )
-                      }
-                      disabled={!canEdit}
-                      className="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-400">
-                    <div className="max-h-20 overflow-y-auto whitespace-pre-wrap">
-                      {shipment.notes || 'N/A'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-400">
-                        {shipment.items && shipment.items.length > 0 ? (
-                      <ul className="list-disc list-inside text-xs max-h-32 overflow-y-auto">
-                        {shipment.items.map((item: InboundShipmentItem, itemIndex: number) => (
-                          <li key={itemIndex}>
-                            {item.sku}: {item.quantity} {item.pushed ? '(Pushed)' : ''}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      'N/A'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {shipment.trackingNumber && (
+                <>
+                  <tr key={shipment.id} className="hover:bg-slate-700">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-300">
                       <button
-                        onClick={() =>
-                            openTrackingPage(String(shipment.trackingNumber ?? ''), String(shipment.shipmentType ?? ''))
-                          }
-                        className="text-blue-400 hover:text-blue-300 px-3 py-1 rounded-lg border border-blue-700/30 hover:bg-blue-700/20 transition-colors text-xs font-medium"
+                        onClick={() => toggleExpanded(String(shipment.id ?? ''))}
+                        className="px-2 py-1 rounded border border-slate-600 hover:bg-slate-600"
+                        title="Toggle details"
                       >
-                        Track
+                        <i
+                          className={`fas ${expandedRows[String(shipment.id ?? '')] ? 'fa-chevron-down' : 'fa-chevron-right'}`}
+                        ></i>
                       </button>
-                    )}
-                    {canEdit && (
-                      <>
-                        {shipment.status === 'Complete' &&
-                          shipment.items &&
-                          shipment.items.some((item: InboundShipmentItem) => !item.pushed) && (
-                            <button
-                              // onClick={() => pushShipmentToInventory(shipment.id)} // Uncomment when implemented
-                              disabled={loading}
-                              className="text-green-400 hover:text-green-300 px-3 py-1 rounded-lg border border-green-700/30 hover:bg-green-700/20 transition-colors text-xs font-medium"
-                            >
-                              Push to Inventory
-                            </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
+                      {shipment.poNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                      {shipment.trackingNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                      {shipment.vendor}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                      {shipment.shipmentType || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <select
+                        value={shipment.status}
+                        onChange={e => handleStatusChange(String(shipment.id), e.target.value)}
+                        disabled={!canEdit}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 text-sm py-1 bg-slate-900 text-slate-100"
+                      >
+                        {statusOptions.map(option => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {shipment.status !== 'Complete' && canEdit && (
+                        <button
+                          onClick={() => handleReceiveShipment(String(shipment.id), shipment.items?.length ?? 0)}
+                          className="text-green-400 hover:text-green-300 px-3 py-1 rounded-lg border border-green-700/30 hover:bg-green-700/20 transition-colors text-xs font-medium"
+                        >
+                          Receive
+                        </button>
+                      )}
+                      {shipment.trackingNumber && (
+                        <button
+                          onClick={() => handleCopyTracking(String(shipment.trackingNumber))}
+                          className="text-blue-400 hover:text-blue-300 ml-2 px-3 py-1 rounded-lg border border-blue-700/30 hover:bg-blue-700/20 transition-colors text-xs font-medium"
+                        >
+                          Track
+                        </button>
+                      )}
+                      {canEdit && (
+                        <>
+                          <button
+                            onClick={() => openEditShipmentModal(shipment)}
+                            className="text-yellow-400 hover:text-yellow-300 ml-2 px-3 py-1 rounded-lg border border-yellow-700/30 hover:bg-yellow-700/20 transition-colors text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteShipment(String(shipment.id), String(shipment.poNumber ?? ''))}
+                            className="text-red-400 hover:text-red-300 ml-2 px-3 py-1 rounded-lg border border-red-700/30 hover:bg-red-700/20 transition-colors text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                  {expandedRows[String(shipment.id ?? '')] && (
+                    <tr className="bg-slate-900/40">
+                      <td className="px-4 py-4"></td>
+                      <td colSpan={6} className="px-6 py-4 text-sm text-slate-300">
+                        <p className="text-xs text-slate-500 mb-3">
+                          Added:{' '}
+                          {shipment.created
+                            ? formatLocalDateTime(shipment.created)
+                            : 'N/A'}
+                        </p>
+                        <div className="mb-3">
+                          <p className="font-semibold text-cyan-300 mb-1">Items</p>
+                          {shipment.items && shipment.items.length > 0 ? (
+                            <ul className="list-disc list-inside text-xs max-h-32 overflow-y-auto">
+                              {shipment.items.map((item: InboundShipmentItem, itemIndex: number) => (
+                                <li key={itemIndex}>
+                                  {item.sku}: {item.quantity} {item.pushed ? '(Pushed)' : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-slate-400">No items.</span>
                           )}
-                        <button
-                          onClick={() => openEditShipmentModal(shipment)}
-                          className="text-yellow-400 hover:text-yellow-300 ml-2 px-3 py-1 rounded-lg border border-yellow-700/30 hover:bg-yellow-700/20 transition-colors text-xs font-medium"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteShipment(String(shipment.id ?? ''), String(shipment.poNumber ?? ''))}
-                          className="text-red-400 hover:text-red-300 ml-2 px-3 py-1 rounded-lg border border-red-700/30 hover:bg-red-700/20 transition-colors text-xs font-medium"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
+                        </div>
+
+                        <div className="mb-3">
+                          <p className="font-semibold text-cyan-300 mb-2">Checklist</p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {CHECKLIST_ITEMS.map(item => {
+                              const checked = Boolean(
+                                shipment[item.field as keyof typeof shipment]
+                              );
+                              const cls = getChecklistItemClass(checked, item.color);
+                              return (
+                                <label
+                                  key={item.field}
+                                  className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${cls.card}${!canEdit ? ' opacity-50 pointer-events-none' : ' cursor-pointer'}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() =>
+                                      handleConfirmationToggle(
+                                        String(shipment.id),
+                                        item.field,
+                                        checked,
+                                        shipment.items || []
+                                      )
+                                    }
+                                    className="hidden"
+                                  />
+                                  <div
+                                    className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${cls.check}`}
+                                  >
+                                    {checked && (
+                                      <i className="fas fa-check text-white text-xs" />
+                                    )}
+                                  </div>
+                                  <i className={`${item.icon} ${cls.iconColor} w-4`} />
+                                  <span
+                                    className={`text-sm ${checked ? 'text-slate-200' : 'text-slate-400'}`}
+                                  >
+                                    {item.label}
+                                  </span>
+                                  {checked && (
+                                    <i
+                                      className={`fas fa-check-circle text-xs ml-auto ${cls.iconColor}`}
+                                    />
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-cyan-300 mb-1">Notes</p>
+                          <p className="text-slate-400 whitespace-pre-wrap">
+                            {shipment.notes || 'N/A'}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>

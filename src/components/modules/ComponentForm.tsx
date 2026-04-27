@@ -19,6 +19,7 @@ const ComponentForm: React.FC<ComponentFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<ComponentItem>(
     initialData || {
+      id: '',
       name: '',
       sku: '',
       onlineStock: 0,
@@ -32,6 +33,7 @@ const ComponentForm: React.FC<ComponentFormProps> = ({
     if (isOpen) {
       setFormData(
         initialData || {
+          id: '',
           name: '',
           sku: '',
           onlineStock: 0,

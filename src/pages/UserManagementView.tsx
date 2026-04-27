@@ -3,6 +3,7 @@ import { useUsers } from '../hooks/useUsers';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
 import type { User } from '../types/user';
+import usersLogo from '../assets/logos/generic-users.svg';
 
 const AIDA_FUNCTIONS = [
   'Inventory',
@@ -59,8 +60,9 @@ const UserManagementView = () => {
 
   return (
     <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3">
-        <i className="fas fa-users-cog text-purple-400 mr-2"></i>User Management
+      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3 flex items-center gap-2">
+        <img src={usersLogo} alt="User management logo" className="w-7 h-7 object-contain" />
+        User Management
       </h2>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-700">

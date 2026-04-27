@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
+import { formatLocalDateTime } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useRMATracker } from '../hooks/useRMATracker';
 import RMAEntryModal from '../components/modules/RMAEntryModal';
+import RefurbishedPromotionModal from '../components/inventory/RefurbishedPromotionModal';
 import type { RMAEntry } from '../types/rma';
 
 function RMATrackerView() {
@@ -27,6 +29,11 @@ function RMATrackerView() {
   const [rmaToEdit, setRmaToEdit] = useState<RMAEntry | null>(null);
   const [showEditRMAEntryModal, setShowEditRMAEntryModal] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [pendingCompleteId, setPendingCompleteId] = useState<string | null>(null);
+  const [entryToPromote, setEntryToPromote] = useState<RMAEntry | null>(null);
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [sortColumn, setSortColumn] = useState<keyof RMAEntry>('timestamp');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   /**
    * Status options for RMA entries
@@ -40,26 +47,36 @@ function RMATrackerView() {
   const canDelete = userRoles?.['RMA Tracker'] === 'Editor';
 
   /**
+   * Sort all entries based on sortColumn / sortDirection
+   */
+  const sortedEntries = useMemo(() => {
+    return [...rmaEntries].sort((a, b) => {
+      const aVal = a[sortColumn];
+      const bVal = b[sortColumn];
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      return 0;
+    });
+  }, [rmaEntries, sortColumn, sortDirection]);
+
+  /**
    * Split RMAs into active and completed groups
    */
   const { activeRmas, completedRmas } = useMemo(() => {
     const active: RMAEntry[] = [];
     const completed: RMAEntry[] = [];
-    rmaEntries.forEach((rma: RMAEntry) => {
+    sortedEntries.forEach((rma: RMAEntry) => {
       if (rma.status === 'Completed') {
         completed.push(rma);
       } else {
         active.push(rma);
       }
     });
-    // Sort completed by date descending to show the most recent ones first
-    completed.sort((a, b) => {
-      const dateA = a.timestamp ? new Date(String(a.timestamp)).valueOf() : 0;
-      const dateB = b.timestamp ? new Date(String(b.timestamp)).valueOf() : 0;
-      return dateB - dateA;
-    });
     return { activeRmas: active, completedRmas: completed };
-  }, [rmaEntries]);
+  }, [sortedEntries]);
 
   // Handles adding a new RMA entry from the RMAEntryModal
   const handleAddRMAEntry = async (entryData: Partial<RMAEntry>) => {
@@ -137,6 +154,17 @@ function RMATrackerView() {
       showToast('Permission denied. You do not have access to change RMA status.', 'error');
       return;
     }
+
+    if (newStatus === 'Completed') {
+      const entry = rmaEntries.find(e => e.id === id);
+      if (entry) {
+        setEntryToPromote({ ...entry, status: 'Completed' });
+        setPendingCompleteId(id);
+        setShowPromoteModal(true);
+      }
+      return;
+    }
+
     try {
       await updateRMAStatus(id, newStatus);
       showToast('RMA status updated!', 'success');
@@ -271,14 +299,16 @@ function RMATrackerView() {
      * Renders a single RMA table row
      */
     <>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">{rma.timestamp}</td>
+      <td
+        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200 cursor-help"
+        title={`Entered: ${rma.created ? formatLocalDateTime(rma.created) : 'N/A'}`}
+      >
+        {rma.ticketNumber || 'N/A'}
+      </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
         {rma.customerName}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{rma.orderNumber}</td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-        {rma.ticketNumber || 'N/A'}
-      </td>
       <td className="px-6 py-4 whitespace-pre-wrap text-sm text-slate-400">{rma.device}</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 flex items-center">
         {rma.trackingNumber || 'N/A'}
@@ -353,27 +383,38 @@ function RMATrackerView() {
         <table className="min-w-full divide-y divide-slate-700 rounded-xl overflow-hidden">
           <thead className="bg-slate-700">
             <tr className="rounded-t-xl">
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Entered
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Customer Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Order No.
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Ticket No.
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Device(s)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Tracking No.
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                Status
-              </th>
+              {(
+                [
+                  { label: 'RMA No.', col: 'ticketNumber' },
+                  { label: 'Customer Name', col: 'customerName' },
+                  { label: 'Order No.', col: 'orderNumber' },
+                  { label: 'Device(s)', col: 'device' },
+                  { label: 'Tracking No.', col: 'trackingNumber' },
+                  { label: 'Status', col: 'status' },
+                ] as { label: string; col: keyof RMAEntry }[]
+              ).map(({ label, col }) => (
+                <th
+                  key={col}
+                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200"
+                  onClick={() => {
+                    if (sortColumn === col) {
+                      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+                    } else {
+                      setSortColumn(col);
+                      setSortDirection('asc');
+                    }
+                  }}
+                >
+                  {label}
+                  {sortColumn === col ? (
+                    <span className="text-cyan-400 ml-1">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  ) : (
+                    <span className="text-slate-600 ml-1">↕</span>
+                  )}
+                </th>
+              ))}
               <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Actions
               </th>
@@ -422,27 +463,38 @@ function RMATrackerView() {
             <table className="min-w-full divide-y divide-slate-700">
               <thead className="bg-slate-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Entered
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Customer Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Order No.
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Ticket No.
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Device(s)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Tracking No.
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Status
-                  </th>
+                  {(
+                    [
+                      { label: 'RMA No.', col: 'ticketNumber' },
+                      { label: 'Customer Name', col: 'customerName' },
+                      { label: 'Order No.', col: 'orderNumber' },
+                      { label: 'Device(s)', col: 'device' },
+                      { label: 'Tracking No.', col: 'trackingNumber' },
+                      { label: 'Status', col: 'status' },
+                    ] as { label: string; col: keyof RMAEntry }[]
+                  ).map(({ label, col }) => (
+                    <th
+                      key={col}
+                      className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200"
+                      onClick={() => {
+                        if (sortColumn === col) {
+                          setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+                        } else {
+                          setSortColumn(col);
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      {label}
+                      {sortColumn === col ? (
+                        <span className="text-cyan-400 ml-1">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600 ml-1">↕</span>
+                      )}
+                    </th>
+                  ))}
                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Actions
                   </th>
@@ -491,6 +543,30 @@ function RMATrackerView() {
           initialData={rmaToEdit} // Pass the data of the entry being edited
         />
       )}
+
+      <RefurbishedPromotionModal
+        isOpen={showPromoteModal}
+        onClose={() => {
+          setPendingCompleteId(null);
+          setShowPromoteModal(false);
+          setEntryToPromote(null);
+          showToast('Promotion cancelled — status unchanged.', 'info');
+        }}
+        onSuccess={async () => {
+          if (pendingCompleteId) {
+            try {
+              await updateRMAStatus(pendingCompleteId, 'Completed');
+              showToast('RMA marked as Completed.', 'success');
+            } catch (e) {
+              console.error('Error completing RMA:', e);
+            }
+            setPendingCompleteId(null);
+          }
+          setShowPromoteModal(false);
+          setEntryToPromote(null);
+        }}
+        rmaEntry={entryToPromote}
+      />
     </section>
   );
 }

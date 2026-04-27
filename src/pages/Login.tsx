@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import logoWebp from '../../inspiration/assets/logo_big.webp';
-import logoAvif from '../../inspiration/assets/logo_big.avif';
+import brandLogo from '../assets/logos/aida-brand.svg';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -12,22 +11,10 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [pngFallback, setPngFallback] = useState<string | null>(null);
+  const [isLogoReady, setIsLogoReady] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-    import('../../inspiration/assets/logo_big.png')
-      .then(mod => {
-        const m = mod as { default?: string } | string | undefined;
-        const value = typeof m === 'string' ? m : (m && m.default) ? m.default : undefined;
-        if (mounted) setPngFallback(value || null);
-      })
-      .catch(err => {
-        console.error('Failed to load logo PNG fallback dynamically', err);
-      });
-    return () => {
-      mounted = false;
-    };
+    setIsLogoReady(true);
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -51,15 +38,11 @@ const Login = () => {
     <div className="flex items-center justify-center h-screen bg-slate-900">
       <div className="bg-slate-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
         <div className="flex flex-col items-center mb-4">
-          <picture>
-            <source srcSet={logoAvif} type="image/avif" />
-            <source srcSet={logoWebp} type="image/webp" />
-            {pngFallback ? (
-              <img src={pngFallback} alt="AIDA Logo" className="w-24 h-20 object-contain mb-2" loading="lazy" />
-            ) : (
-              <div className="w-24 h-20 bg-slate-700 rounded-sm mb-2" aria-hidden />
-            )}
-          </picture>
+          {isLogoReady ? (
+            <img src={brandLogo} alt="AIDA Logo" className="w-24 h-20 object-contain mb-2" loading="lazy" />
+          ) : (
+            <div className="w-24 h-20 bg-slate-700 rounded-sm mb-2" aria-hidden />
+          )}
           <h1 className="text-3xl font-bold text-cyan-400 mb-2 text-center">AIDA Login</h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

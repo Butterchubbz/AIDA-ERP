@@ -1,44 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
-import { pb } from '../lib/pocketbase';
+import { useCallback } from 'react';
+import { COLLECTIONS } from '../lib/collections';
 import type { User } from '../types/user';
+import { useCollectionCrud } from './useCollectionCrud';
 
 export const useUsers = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const records = await pb.collection('users').getFullList();
-      setUsers(records as unknown as User[]);
-    } catch (err) {
-      setError('Failed to fetch users.');
-      console.error(err);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+  const { items, loading, error, updateItem } = useCollectionCrud<User>({
+    collection: COLLECTIONS.USERS,
+    fetchErrorMessage: 'Failed to fetch users.',
+    updateErrorMessage: 'Failed to update user roles.',
+  });
 
   const updateUserRoles = useCallback(
     async (userId: string, roles: { [key: string]: string }) => {
-      setLoading(true);
-      try {
-        // Assuming roles are stored in a 'roles' field as a JSON object or similar
-        await pb.collection('users').update(userId, { roles: roles });
-        await fetchUsers(); // Refetch users to update UI
-      } catch (err) {
-        setError('Failed to update user roles.');
-        console.error(err);
-      }
-      setLoading(false);
+      await updateItem(userId, { roles } as Partial<User>);
     },
-    [fetchUsers]
+    [updateItem]
   );
 
-  return { users, loading, error, updateUserRoles };
+  return { users: items, loading, error, updateUserRoles };
 };

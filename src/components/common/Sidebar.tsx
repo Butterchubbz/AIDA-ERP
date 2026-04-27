@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useModeStore } from '../../stores/mode';
 
 const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null }) => {
   const location = useLocation();
+  const { isTeam } = useModeStore();
 
   const isPathActive = useCallback(
     (pathSegment: string): boolean => {
@@ -11,17 +13,22 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
     [location.pathname]
   );
 
+  const isOrdersPathActive = useCallback(
+    () => isPathActive('/orders') || isPathActive('/quotes'),
+    [isPathActive]
+  );
+
   const [isInventoryOpen, setInventoryOpen] = useState(isPathActive('/inventory'));
   const [isForecastingOpen, setForecastingOpen] = useState(isPathActive('/forecasting'));
   const [isAmazonOpen, setAmazonOpen] = useState(isPathActive('/amazon'));
-  const [isOrdersOpen, setOrdersOpen] = useState(isPathActive('/orders'));
+  const [isOrdersOpen, setOrdersOpen] = useState(isOrdersPathActive());
 
   useEffect(() => {
     setInventoryOpen(isPathActive('/inventory'));
     setForecastingOpen(isPathActive('/forecasting'));
     setAmazonOpen(isPathActive('/amazon'));
-    setOrdersOpen(isPathActive('/orders'));
-  }, [isPathActive]);
+    setOrdersOpen(isOrdersPathActive());
+  }, [isOrdersPathActive, isPathActive]);
 
   const baseLinkClasses =
     'w-full text-left px-4 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center';
@@ -120,8 +127,18 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
                     </NavLink>
                   </li>
                   <li>
+                    <NavLink to="/forecasting/purchase-order" className={getSubNavLinkClass}>
+                      Purchase Orders
+                    </NavLink>
+                  </li>
+                  <li>
                     <NavLink to="/forecasting/manual" className={getSubNavLinkClass}>
                       Manual
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink to="/forecasting/settings" className={getSubNavLinkClass}>
+                      Settings
                     </NavLink>
                   </li>
                 </ul>
@@ -174,7 +191,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
               <button
                 onClick={() => setOrdersOpen(!isOrdersOpen)}
                 className={`${baseLinkClasses} justify-between ${
-                  isPathActive('/orders') ? 'text-white' : 'text-slate-300'
+                  isOrdersPathActive() ? 'text-white' : 'text-slate-300'
                 }`}
               >
                 <span className="flex items-center">
@@ -221,16 +238,20 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
               <i className="fas fa-user-circle w-6 text-center mr-3"></i>My Profile
             </NavLink>
           </li>
-          {userRoles?.Admin === 'Editor' && (
+          {isTeam && (userRoles?.Admin === 'Editor' || userRoles?.Admin === 'Admin') && (
             <>
               <li>
                 <NavLink to="/users" className={getNavLinkClass}>
                   <i className="fas fa-users-cog w-6 text-center mr-3"></i>User Management
                 </NavLink>
               </li>
+            </>
+          )}
+          {userRoles?.Admin === 'Editor' && (
+            <>
               <li>
                 <NavLink to="/data" className={getNavLinkClass}>
-                  <i className="fas fa-database w-6 text-center mr-3"></i>Data Management
+                  <i className="fas fa-cog w-6 text-center mr-3"></i>AIDA Management
                 </NavLink>
               </li>
             </>

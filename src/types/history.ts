@@ -1,11 +1,14 @@
 export interface HistoryRecord {
   id: string;
-  timestamp: string; // ISO string or human-readable date
+  inventoryItemId: string;
   field: string;
-  oldValue: string | number | null;
-  newValue: string | number | null;
-  change: number; // numeric delta
+  oldValue: number;
+  newValue: number;
+  change: number;
+  operation: string;
   changedByEmail?: string;
+  timestamp?: string;
+  created?: string;
 }
 
 export interface HistoryEntry {

@@ -1,14 +1,4 @@
-// Remove broken import and use local type only
+import type { DeviceItem } from './device';
 
-export interface InventoryItem {
-  id: string;
-  name: string;
-  sku: string;
-  onlineStock: number;
-  productionStock: number;
-  warehouseStock: number;
-  reserveStock: number;
-  quantity: number;
-  location?: string;
-  countedStock?: number;
-}
+// InventoryItem is an alias for DeviceItem — both represent the inventoryDevice collection
+export type InventoryItem = DeviceItem;

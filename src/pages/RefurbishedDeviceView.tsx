@@ -10,6 +10,7 @@ import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
 import RefurbishedDeviceForm from '../components/modules/RefurbishedDeviceForm';
 import type { RefurbishedDevice } from '../types/refurbished';
 import type { HistoryRecord } from '../types/history';
+import refurbishedLogo from '../assets/logos/generic-rma.svg';
 
 function RefurbishedDeviceView() {
   const { devices, loading, error, addDevice, updateDevice, deleteDevice, reorderDevices } =
@@ -188,8 +189,9 @@ function RefurbishedDeviceView() {
 
   return (
     <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3">
-        <i className="fas fa-tools text-orange-400 mr-2"></i>Refurbished/RMA Devices
+      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3 flex items-center gap-2">
+        <img src={refurbishedLogo} alt="Refurbished and RMA logo" className="w-7 h-7 object-contain" />
+        Refurbished/RMA Devices
       </h2>
 
       <div className="mb-6">

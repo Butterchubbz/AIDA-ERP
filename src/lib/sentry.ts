@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/browser';
-import { BrowserTracing } from '@sentry/tracing';
+import { browserTracingIntegration } from '@sentry/browser';
 import { viteEnv } from './env';
 
 export function initSentry() {
@@ -8,7 +8,7 @@ export function initSentry() {
   const release = viteEnv.VITE_SENTRY_RELEASE || process.env.VITE_SENTRY_RELEASE;
   Sentry.init({
     dsn,
-    integrations: [new BrowserTracing()],
+    integrations: [browserTracingIntegration()],
     tracesSampleRate: 0.1,
     environment: viteEnv.NODE_ENV || 'production',
     release,

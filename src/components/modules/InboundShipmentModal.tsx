@@ -24,7 +24,7 @@ interface InboundShipmentModalProps {
   isSubmitting: boolean;
   canEdit: boolean;
   initialData: InboundShipmentData | null;
-  searchSKU: (searchString: string) => Promise<{ sku: string }[]>;
+  searchSKU: (searchString: string) => Promise<{ sku: string; name: string }[]>;
 }
 
 const InboundShipmentModal: React.FC<InboundShipmentModalProps> = ({
@@ -51,7 +51,7 @@ const InboundShipmentModal: React.FC<InboundShipmentModalProps> = ({
   const [modalEntryItems, setModalEntryItems] = useState<InboundShipmentItem[]>(
     initialData?.items || [{ sku: '', quantity: 0 }]
   );
-  const [skuSearchResults, setSkuSearchResults] = useState<{ sku: string }[]>([]);
+  const [skuSearchResults, setSkuSearchResults] = useState<{ sku: string; name: string }[]>([]);
   const [activeSkuSearch, setActiveSkuSearch] = useState<number>(-1);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ const InboundShipmentModal: React.FC<InboundShipmentModalProps> = ({
 
   const handleSkuSearch = async (index: number, searchString: string) => {
     handleItemChange(index, 'sku', searchString);
-    if (searchString.length > 2) {
+    if (searchString.length >= 2) {
       const results = await searchSKU(searchString);
       setSkuSearchResults(results);
       setActiveSkuSearch(index);
@@ -272,7 +272,8 @@ const InboundShipmentModal: React.FC<InboundShipmentModalProps> = ({
                         onClick={() => selectSku(index, result.sku)}
                         className="p-2 hover:bg-slate-700 cursor-pointer"
                       >
-                        {result.sku}
+                        <span className="font-mono text-cyan-400">{result.sku}</span>
+                        <span className="text-slate-400 ml-2 text-sm">{result.name}</span>
                       </li>
                     ))}
                   </ul>

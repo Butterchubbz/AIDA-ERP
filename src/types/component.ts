@@ -1,9 +1,12 @@
 export interface ComponentItem {
-  id?: string;
+  id: string;
   name: string;
   sku: string;
+  barcode?: string;
   onlineStock: number;
-  category: string;
-  subcategory: string;
   countedStock: number;
+  category?: string;
+  subcategory?: string;
+  created?: string;
+  updated?: string;
 }
