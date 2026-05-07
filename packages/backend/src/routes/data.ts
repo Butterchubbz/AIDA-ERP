@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import pb from '../lib/pocketbase.js'
+import { parseCSV } from '../lib/csvParser.js'
 
 /**
  * GET /api/refurbished
@@ -197,4 +198,78 @@ export async function deletePreset(req: Request, res: Response): Promise<void> {
     console.error('[Presets] DELETE failed:', err)
     res.status(400).json({ error: 'Failed to delete preset' })
   }
+}
+
+/**
+ * POST /api/data/import
+ * Import sales data from a CSV body.
+ *
+ * Request body (JSON): { csv: string }
+ * Expected CSV columns: sku, quantity, saleDate (optional), salePrice (optional)
+ *
+ * Validates each row's SKU against deviceInventory.
+ * Creates a salesData record per valid row with source='manual_csv'.
+ * Returns { recordsImported, errors } — partial success is allowed.
+ */
+export async function importSalesDataCSV(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+
+  const { csv } = req.body as { csv?: unknown }
+
+  if (typeof csv !== 'string' || !csv.trim()) {
+    res.status(400).json({ error: 'Request body must include a non-empty "csv" string field' })
+    return
+  }
+
+  const { rows, errors } = parseCSV(csv)
+
+  if (rows.length === 0) {
+    res.status(400).json({
+      error: 'No valid rows parsed from CSV',
+      recordsImported: 0,
+      errors,
+    })
+    return
+  }
+
+  // Validate SKUs exist in deviceInventory
+  let knownSkus: Set<string>
+  try {
+    const devices = await pb.collection('deviceInventory').getFullList({ fields: 'sku' })
+    knownSkus = new Set(devices.map((d) => (d as unknown as { sku: string }).sku))
+  } catch (err: unknown) {
+    console.error('[CSV Import] Failed to fetch device SKUs:', err)
+    res.status(500).json({ error: 'Failed to validate SKUs against inventory' })
+    return
+  }
+
+  let recordsImported = 0
+  const importErrors = [...errors]
+
+  for (const row of rows) {
+    if (!knownSkus.has(row.sku)) {
+      importErrors.push({ row: 0, message: `Unknown SKU: "${row.sku}" — not found in device inventory` })
+      continue
+    }
+
+    try {
+      await pb.collection('salesData').create({
+        sku: row.sku,
+        quantity: row.quantity,
+        saleDate: row.saleDate ?? new Date().toISOString(),
+        salePrice: row.salePrice ?? 0,
+        source: 'manual_csv',
+        userId: req.user.id,
+      })
+      recordsImported++
+    } catch (err: unknown) {
+      console.error(`[CSV Import] Failed to create salesData record for SKU "${row.sku}":`, err)
+      importErrors.push({ row: 0, message: `Failed to save record for SKU "${row.sku}"` })
+    }
+  }
+
+  res.status(200).json({ recordsImported, errors: importErrors })
 }

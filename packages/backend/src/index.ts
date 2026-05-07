@@ -65,6 +65,7 @@ import {
   listPresets,
   createPreset,
   deletePreset,
+  importSalesDataCSV,
 } from './routes/data.js'
 
 const app = express()
@@ -183,6 +184,7 @@ app.post('/api/sales-data/upsert', requireAuth, upsertSalesData)
 app.get('/api/presets/:collectionId', requireAuth, listPresets)
 app.post('/api/presets/:collectionId', requireAuth, createPreset)
 app.delete('/api/presets/:recordId', requireAuth, deletePreset)
+app.post('/api/data/import', requireAuth, importSalesDataCSV)
 
 /**
  * Error handler
