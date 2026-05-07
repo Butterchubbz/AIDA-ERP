@@ -8,6 +8,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
 import ComponentForm from '../components/modules/ComponentForm';
 import ComponentStockCountModal from '../components/modules/ComponentStockCountModal';
+import CameraScannerModal from '../components/modules/CameraScannerModal';
 import PageContainer from '../components/common/PageContainer';
 import type { ComponentItem } from '../types/component';
 import type { StockCountUpdate } from '../types/stock';
@@ -30,9 +31,11 @@ function InventoryComponentsView() {
   const COMPONENT_ORDER_KEY = 'aida_component_order';
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [showScannerModal, setShowScannerModal] = useState(false);
   const [sortColumn, setSortColumn] = useState('sku');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [orderedComponents, setOrderedComponents] = useState<ComponentItem[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
   const [userHasSorted, setUserHasSorted] = useState(false);
   const justDragged = React.useRef(false);
 
@@ -52,6 +55,7 @@ function InventoryComponentsView() {
   const canCount = userRoles?.Inventory === 'Editor' || userRoles?.Inventory === 'Viewer';
 
   useEffect(() => {
+    if (componentInventory.length === 0) return;
     if (justDragged.current) {
       justDragged.current = false;
       return;
@@ -66,6 +70,7 @@ function InventoryComponentsView() {
     } else {
       setOrderedComponents([...componentInventory]);
     }
+    setIsDirty(false);
   }, [componentInventory]);
 
   // Remove noisy debug logs in production; keep effect for future debugging if needed
@@ -130,18 +135,25 @@ function InventoryComponentsView() {
         return item;
       });
 
-      localStorage.setItem(COMPONENT_ORDER_KEY, JSON.stringify(reorderedAll.map(i => i.id)));
       setOrderedComponents(reorderedAll);
+      setIsDirty(true);
       if (userHasSorted) setUserHasSorted(false);
       justDragged.current = false;
     },
     [orderedComponents, userHasSorted]
   );
 
+  const handleSaveOrder = useCallback(() => {
+    localStorage.setItem(COMPONENT_ORDER_KEY, JSON.stringify(orderedComponents.map(i => i.id)));
+    setIsDirty(false);
+    showToast('Order saved', 'success');
+  }, [orderedComponents, showToast]);
+
   const handleResetOrder = useCallback(() => {
-    setUserHasSorted(false);
     localStorage.removeItem(COMPONENT_ORDER_KEY);
     setOrderedComponents([...componentInventory]);
+    setIsDirty(false);
+    setUserHasSorted(false);
   }, [componentInventory]);
 
   // Filter and Sort component inventory
@@ -333,6 +345,13 @@ function InventoryComponentsView() {
               Count Stock
             </button>
             <button
+              onClick={handleSaveOrder}
+              disabled={!isDirty}
+              className="px-3 py-1.5 rounded-md text-sm bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors ml-3"
+            >
+              Save Order
+            </button>
+            <button
               onClick={handleResetOrder}
               className="inline-flex items-center px-4 py-2 ml-3 border border-slate-500 text-base font-bold rounded-md shadow-sm text-slate-100 bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
               title="Reset custom drag order"
@@ -344,15 +363,23 @@ function InventoryComponentsView() {
         )}
 
         {/* Search Input */}
-        <div className="mb-6">
+        <div className="mb-6 flex gap-2 items-center">
           <input
             type="text"
             placeholder="Search by name or SKU..."
             value={searchTerm}
             onChange={handleSearchChange}
-            className="w-full px-4 py-2 border border-slate-600 rounded-md bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+            className="flex-1 px-4 py-2 border border-slate-600 rounded-md bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
             aria-label="Search component items"
           />
+          <button
+            onClick={() => setShowScannerModal(true)}
+            className="inline-flex items-center px-3 py-2 border border-slate-500 text-sm font-medium rounded-md text-slate-100 bg-slate-700 hover:bg-slate-600"
+            title="Scan barcode to search"
+          >
+            <i className="fas fa-barcode mr-2"></i>
+            Scan
+          </button>
         </div>
 
         {groupedAndSortedInventory.length === 0 && !loadingComponents ? (
@@ -530,6 +557,17 @@ function InventoryComponentsView() {
           onSubmit={handleSaveComponentCounts}
           itemType="component"
           isSubmitting={isCounting}
+        />
+
+        {/* Barcode Scanner Modal */}
+        <CameraScannerModal
+          isOpen={showScannerModal}
+          onClose={() => setShowScannerModal(false)}
+          onScan={(barcode) => {
+            setSearchTerm(barcode)
+            setShowScannerModal(false)
+          }}
+          title="Scan Component Barcode"
         />
 
         {/* History Modal */}

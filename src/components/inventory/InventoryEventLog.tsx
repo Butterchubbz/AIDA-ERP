@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
-import { pb } from '../../lib/pocketbase'
 import { COLLECTIONS } from '../../lib/collections'
 import type { HistoryRecord } from '../../types/history'
+import { listRecords } from '../../lib/pocketbaseApi'
+import ModalShell from '../common/ModalShell'
+import TableShell from '../common/TableShell'
+import { formatLocalDateTime } from '../../utils/date'
 
 interface Props {
   itemId: string
@@ -21,8 +24,7 @@ export default function InventoryEventLog({
 
   useEffect(() => {
     let cancelled = false
-    pb.collection(COLLECTIONS.STOCK_HISTORY)
-      .getFullList({
+    listRecords<HistoryRecord>(COLLECTIONS.STOCK_HISTORY, {
         filter: `inventoryItemId = "${itemId}"`,
         sort: '-created',
       })
@@ -37,10 +39,10 @@ export default function InventoryEventLog({
   }, [itemId])
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 
-      flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-slate-800 rounded-lg shadow-xl p-6 
-        w-full max-w-screen-lg my-8 text-slate-100">
+    <ModalShell
+      backdropClassName="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 overflow-y-auto"
+      panelClassName="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-screen-lg my-8 text-slate-100"
+    >
         <h3 className="text-lg font-bold mb-4 text-cyan-400">
           Stock History - "{itemName}"
         </h3>
@@ -53,8 +55,7 @@ export default function InventoryEventLog({
             No history recorded yet for this item.
           </p>
         ) : (
-          <div className="overflow-x-auto max-h-96">
-            <table className="min-w-full divide-y divide-slate-700">
+          <TableShell wrapperClassName="overflow-x-auto max-h-96 rounded-lg border border-slate-700">
               <thead className="bg-slate-700">
                 <tr>
                   {['Date', 'Field', 'Old', 'New', 'Change',
@@ -71,9 +72,7 @@ export default function InventoryEventLog({
                 {records.map(r => (
                   <tr key={r.id}>
                     <td className="px-4 py-3 text-sm text-slate-300">
-                      {r.created
-                        ? new Date(r.created).toLocaleString()
-                        : '-'}
+                      {r.created ? formatLocalDateTime(r.created) : '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">
                       {r.field}
@@ -95,8 +94,7 @@ export default function InventoryEventLog({
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </TableShell>
         )}
         <div className="flex justify-end mt-6">
           <button
@@ -107,7 +105,6 @@ export default function InventoryEventLog({
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }

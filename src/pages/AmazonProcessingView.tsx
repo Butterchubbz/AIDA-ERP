@@ -1,11 +1,39 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAmazonPOs } from '../hooks/useShippingModules';
 import { useAuth } from '../context/AuthContext';
 import AmazonPOForm from '../components/modules/AmazonPOForm';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useMessageBox } from '../components/common/MessageBox';
-import type { AmazonPO, AmazonPOItem } from '../types/amazon';
+import type { AmazonPO, AmazonPOItem, AmazonListing } from '../types/amazon';
 import amazonLogo from '../assets/logos/generic-amazon.svg';
+
+const AMAZON_LISTINGS_KEY = 'aida_amazon_listings';
+
+function updateListingsFbaStock(poItems: AmazonPOItem[]): void {
+  try {
+    const raw = localStorage.getItem(AMAZON_LISTINGS_KEY);
+    if (!raw) return;
+    const listings: AmazonListing[] = JSON.parse(raw) as AmazonListing[];
+    let changed = false;
+    for (const item of poItems) {
+      for (const listing of listings) {
+        if (
+          item.sku === listing.inventorySku ||
+          item.sku.startsWith(listing.parentSku + '-') ||
+          item.sku === listing.parentSku
+        ) {
+          listing.fbaStock = (listing.fbaStock ?? 0) + item.quantity;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      localStorage.setItem(AMAZON_LISTINGS_KEY, JSON.stringify(listings));
+    }
+  } catch {
+    // Silently ignore localStorage errors
+  }
+}
 
 const AmazonProcessingView = () => {
   const {
@@ -72,6 +100,26 @@ const AmazonProcessingView = () => {
     setExpandedPO(expandedPO === id ? null : id);
   };
 
+  const handleMoveToOutgoing = useCallback(
+    async (po: AmazonPO) => {
+      const confirmed = await showMessageBox(
+        'Mark as Shipped to FBA?',
+        'Mark this shipment as shipped to FBA? This will move it to Outgoing and update FBA stock levels.',
+        true
+      );
+      if (!confirmed) return;
+      try {
+        await updatePurchaseOrder(po.id!, { movedToOutgoing: true } as Partial<AmazonPO>);
+        updateListingsFbaStock(po.items);
+        showToast('Shipment moved to Outgoing and FBA stock updated.', 'success');
+      } catch (e) {
+        console.error('Failed to move PO to outgoing:', e);
+        showToast('Failed to move shipment to Outgoing.', 'error');
+      }
+    },
+    [showMessageBox, showToast, updatePurchaseOrder]
+  );
+
   const getStatusClass = (status: string) => {
     switch (status) {
       case 'Draft':
@@ -82,6 +130,8 @@ const AmazonProcessingView = () => {
         return 'text-purple-400';
       case 'Receiving':
         return 'text-yellow-400';
+      case 'Shipped':
+        return 'text-orange-400';
       case 'Completed':
         return 'text-emerald-400';
       case 'Cancelled':
@@ -145,6 +195,17 @@ const AmazonProcessingView = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
+                  {canEdit && po.status === 'Shipped' && !po.movedToOutgoing && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleMoveToOutgoing(po);
+                      }}
+                      className="text-orange-400 hover:text-orange-300 px-3 py-1 rounded-md border border-orange-700/30 hover:bg-orange-700/20 text-xs font-semibold flex items-center gap-1"
+                    >
+                      <i className="fas fa-arrow-right"></i> Move to Outgoing
+                    </button>
+                  )}
                   {canEdit && (
                     <div className="flex space-x-2">
                       <button

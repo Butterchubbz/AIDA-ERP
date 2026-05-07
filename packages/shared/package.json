@@ -1,0 +1,19 @@
+{
+  "name": "@aida/shared",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsup src/index.ts --format esm,cjs --dts --out-dir dist"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "tsup": "^8"
+  }
+}

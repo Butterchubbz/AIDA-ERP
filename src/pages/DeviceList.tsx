@@ -3,6 +3,7 @@ import { useDeviceContext } from '../context/DeviceContext';
 import { useAuth } from '../context/AuthContext';
 import { useMessageBox } from '../components/common/MessageBox';
 import DeviceStockCountModal from '../components/modules/DeviceStockCountModal';
+import CameraScannerModal from '../components/modules/CameraScannerModal';
 import type { StockCountUpdate } from '../types/stock';
 import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -26,16 +27,19 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCountModal, setShowCountModal] = useState(false);
   const [isCounting, setIsCounting] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
   const [sortColumn, setSortColumn] = useState('sku');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedItemHistory, setSelectedItemHistory] = useState<DeviceItem | null>(null);
   const [orderedDevices, setOrderedDevices] = useState<DeviceItem[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
   const [userHasSorted, setUserHasSorted] = useState(false);
   const justDragged = React.useRef(false);
   const canAddDeleteEdit = userRoles?.Inventory === 'Editor';
 
   useEffect(() => {
+    if (devices.length === 0) return;
     if (justDragged.current) {
       justDragged.current = false;
       return;
@@ -50,6 +54,7 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
     } else {
       setOrderedDevices([...devices]);
     }
+    setIsDirty(false);
   }, [devices]);
 
   const handleSort = (column: string) => {
@@ -75,18 +80,25 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
       const reordered = [...orderedDevices];
       const [moved] = reordered.splice(result.source.index, 1);
       reordered.splice(result.destination.index, 0, moved);
-      localStorage.setItem(DEVICE_ORDER_KEY, JSON.stringify(reordered.map(d => d.id)));
       setOrderedDevices(reordered);
+      setIsDirty(true);
       if (userHasSorted) setUserHasSorted(false);
       justDragged.current = false;
     },
     [orderedDevices, userHasSorted]
   );
 
+  const handleSaveOrder = useCallback(() => {
+    localStorage.setItem(DEVICE_ORDER_KEY, JSON.stringify(orderedDevices.map(i => i.id)));
+    setIsDirty(false);
+    showToast('Order saved', 'success');
+  }, [orderedDevices, showToast]);
+
   const handleResetOrder = useCallback(() => {
-    setUserHasSorted(false);
     localStorage.removeItem(DEVICE_ORDER_KEY);
     setOrderedDevices([...devices]);
+    setIsDirty(false);
+    setUserHasSorted(false);
   }, [devices]);
 
   const displayDevices = useMemo(() => {
@@ -172,6 +184,13 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
               Count Stock
             </button>
             <button
+              onClick={handleSaveOrder}
+              disabled={!isDirty}
+              className="px-3 py-1.5 rounded-md text-sm bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors ml-3"
+            >
+              Save Order
+            </button>
+            <button
               onClick={handleResetOrder}
               className="inline-flex items-center px-4 py-2 ml-3 border border-slate-500 text-base font-bold rounded-md shadow-sm text-slate-100 bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
               title="Reset custom drag order"
@@ -181,13 +200,23 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
             </button>
           </div>
         )}
-        <input
-          type="text"
-          placeholder="Search by name or SKU..."
-          className="w-full px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            placeholder="Search by name or SKU..."
+            className="flex-1 px-4 py-2 border rounded-md bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-100"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+          <button
+            onClick={() => setShowScannerModal(true)}
+            className="inline-flex items-center px-3 py-2 border border-slate-500 text-sm font-medium rounded-md text-slate-100 bg-slate-700 hover:bg-slate-600"
+            title="Scan barcode to search"
+          >
+            <i className="fas fa-barcode mr-2"></i>
+            Scan
+          </button>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-700">
@@ -305,6 +334,15 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
         onSubmit={handleSaveDeviceCounts}
         itemType="device"
         isSubmitting={isCounting}
+      />
+      <CameraScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onScan={(barcode) => {
+          setSearchTerm(barcode)
+          setShowScannerModal(false)
+        }}
+        title="Scan Device Barcode"
       />
       {canAddDeleteEdit && (
         <button

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { StockCountUpdate } from '../../types/stock';
+import ModalShell from '../common/ModalShell';
 
 interface BaseItem {
   id: string;
@@ -48,8 +49,7 @@ const ComponentStockCountModal = <T extends BaseItem>({
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md text-slate-100">
+    <ModalShell panelClassName="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md text-slate-100">
         <h2 className="text-xl font-bold text-cyan-400 mb-4">Stock Count for {itemType}</h2>
         <div className="max-h-96 overflow-y-auto">
           {groupedItems && groupedItems.length > 0
@@ -106,8 +106,7 @@ const ComponentStockCountModal = <T extends BaseItem>({
             Submit
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };
 

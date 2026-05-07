@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { pb } from '../../lib/pocketbase';
 import { COLLECTIONS } from '../../lib/collections';
 import type { RMAEntry } from '../../types/rma';
+import { createRecord } from '../../lib/pocketbaseApi';
+import ModalShell from '../common/ModalShell';
+import StatusBadge from '../common/StatusBadge';
+import { formatLocalDate } from '../../utils/date';
 
 type CertificationStatus = 'RN' | 'RR' | 'S';
 
@@ -170,7 +173,7 @@ export default function RefurbishedPromotionModal({
       const extraNotes = notes.trim();
       const serializedNotes = `--- Original RMA: ${rmaEntry.id ?? 'N/A'}\nOrder Ref: ${rmaEntry.orderNumber ?? 'N/A'}\nIMEI: ${imei || 'N/A'}\nAsking Price: ${price}\nTicket: ${rmaEntry.ticketNumber || 'N/A'} ---${extraNotes ? `\n${extraNotes}` : ''}`;
 
-      await pb.collection(COLLECTIONS.REFURBISHED_DEVICES).create({
+      await createRecord(COLLECTIONS.REFURBISHED_DEVICES, {
         name: deviceName.trim() || rmaEntry.device || 'Refurbished Device',
         sku: normalizedSku,
         refurbishedStock: 1,
@@ -185,7 +188,7 @@ export default function RefurbishedPromotionModal({
         sku: normalizedSku,
         imei,
         price,
-        dateLabel: new Date().toLocaleDateString(),
+        dateLabel: formatLocalDate(new Date()),
         rmaRef: rmaEntry.id ?? rmaEntry.orderNumber ?? 'N/A',
       });
     } catch (e) {
@@ -201,8 +204,7 @@ export default function RefurbishedPromotionModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
-      <div className="w-full max-w-3xl rounded-xl border border-slate-600 bg-slate-800 p-6 text-slate-100 shadow-2xl">
+    <ModalShell>
         <h3 className="text-2xl font-semibold text-cyan-300">Promote To Refurbished Inventory</h3>
         <p className="mt-1 text-sm text-slate-400">
           This RMA is ready to complete. Create a refurbished inventory record before finalizing.
@@ -262,9 +264,10 @@ export default function RefurbishedPromotionModal({
               <option value="RR">RR - Refurbished Restored</option>
               <option value="S">S - Salvage</option>
             </select>
-            <span className={`mt-2 inline-flex rounded px-2 py-1 text-xs font-semibold ${certificationMeta[certificationStatus].badgeClass}`}>
-              {certificationStatus} - {certificationMeta[certificationStatus].label}
-            </span>
+            <StatusBadge
+              className={`mt-2 ${certificationMeta[certificationStatus].badgeClass}`}
+              text={`${certificationStatus} - ${certificationMeta[certificationStatus].label}`}
+            />
           </label>
 
           <label className="block">
@@ -319,8 +322,7 @@ export default function RefurbishedPromotionModal({
             {isSubmitting ? 'Promoting...' : 'Promote & Complete'}
           </button>
         </div>
-      </div>
-    </div>,
+    </ModalShell>,
     document.body
   );
 }
