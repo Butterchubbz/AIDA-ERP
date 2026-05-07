@@ -1,14 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { COLLECTIONS } from '../lib/collections'
 import type { DeviceItem } from '@aida/shared'
 import type { ComponentItem } from '@aida/shared'
-import {
-  createRecord,
-  deleteRecord,
-  listRecords,
-  updateRecord,
-  type CollectionName,
-} from '../lib/pocketbaseApi'
+import { apiClient } from '../lib/apiClient'
 
 interface BaseInventoryItem {
   id: string
@@ -19,9 +12,9 @@ interface BaseInventoryItem {
 }
 
 interface CreateInventoryHookOptions<T extends BaseInventoryItem> {
-  collectionName: CollectionName
+  /** API sub-path under /api, e.g. 'inventory/devices' */
+  apiPath: string
   stockField: keyof T
-  defaultSort?: string
 }
 
 function createInventoryHook<T extends BaseInventoryItem>(options: CreateInventoryHookOptions<T>) {
@@ -34,87 +27,61 @@ function createInventoryHook<T extends BaseInventoryItem>(options: CreateInvento
       setLoading(true)
       setError(null)
       try {
-        const records = await listRecords<T>(options.collectionName, {
-          sort: options.defaultSort ?? '-created',
-        })
+        const records = await apiClient.get<T[]>(`/api/${options.apiPath}`)
         setItems(records)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to fetch items'
         setError(msg)
-        console.error(`[${options.collectionName}] fetch failed:`, msg)
+        console.error(`[${options.apiPath}] fetch failed:`, msg)
       } finally {
         setLoading(false)
       }
-    }, [options.collectionName, options.defaultSort])
+    }, [])
 
     useEffect(() => {
       fetchItems()
     }, [fetchItems])
 
-    const addItem = useCallback(
-      async (data: Partial<T>) => {
-        setLoading(true)
-        try {
-          const record = await createRecord<T>(options.collectionName, data)
-          setItems(prev => [...prev, record])
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : 'Failed to add'
-          setError(msg)
-          console.error(`[${options.collectionName}] add failed:`, msg)
-          throw err
-        } finally {
-          setLoading(false)
-        }
-      },
-      [options.collectionName]
-    )
+    const addItem = useCallback(async (data: Partial<T>) => {
+      setLoading(true)
+      try {
+        const record = await apiClient.post<T>(`/api/${options.apiPath}`, data)
+        setItems(prev => [...prev, record])
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to add'
+        setError(msg)
+        console.error(`[${options.apiPath}] add failed:`, msg)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    }, [])
 
     const updateItem = useCallback(
       async (id: string, data: Partial<T>) => {
         try {
-          const result = await updateRecord<T>(options.collectionName, id, data)
+          const result = await apiClient.patch<T>(`/api/${options.apiPath}/${id}`, data)
           setItems(prev => prev.map(item => (item.id === id ? result : item)))
-
-          if (options.stockField in data) {
-            const oldItem = items.find(i => i.id === id)
-            const oldValue = oldItem ? Number(oldItem[options.stockField]) : 0
-            const newValue = Number(data[options.stockField])
-            try {
-              await createRecord(COLLECTIONS.STOCK_HISTORY, {
-                inventoryItemId: id,
-                field: String(options.stockField),
-                oldValue,
-                newValue,
-                change: newValue - oldValue,
-                operation: 'manual_update',
-              })
-            } catch (historyErr: unknown) {
-              console.error('stock history write failed:', historyErr)
-            }
-          }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : 'Failed to update'
           setError(msg)
-          console.error(`[${options.collectionName}] update failed:`, msg)
+          console.error(`[${options.apiPath}] update failed:`, msg)
           throw err
         }
       },
-      [items, options.collectionName, options.stockField]
+      []
     )
 
-    const deleteItem = useCallback(
-      async (id: string) => {
-        try {
-          await deleteRecord(options.collectionName, id)
-          setItems(prev => prev.filter(item => item.id !== id))
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : 'Failed to delete'
-          setError(msg)
-          throw err
-        }
-      },
-      [options.collectionName]
-    )
+    const deleteItem = useCallback(async (id: string) => {
+      try {
+        await apiClient.delete(`/api/${options.apiPath}/${id}`)
+        setItems(prev => prev.filter(item => item.id !== id))
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to delete'
+        setError(msg)
+        throw err
+      }
+    }, [])
 
     const batchUpdate = useCallback(
       async (updates: { id: string; updatedFields: Partial<T> }[]) => {
@@ -140,15 +107,13 @@ function createInventoryHook<T extends BaseInventoryItem>(options: CreateInvento
 }
 
 const useDeviceInventoryBase = createInventoryHook<DeviceItem>({
-  collectionName: COLLECTIONS.INVENTORY_DEVICE,
+  apiPath: 'inventory/devices',
   stockField: 'warehouseStock',
-  defaultSort: '-updated',
 })
 
 const useComponentInventoryBase = createInventoryHook<ComponentItem>({
-  collectionName: COLLECTIONS.INVENTORY_COMPONENT,
+  apiPath: 'inventory/components',
   stockField: 'countedStock',
-  defaultSort: '-created',
 })
 
 export function useDeviceInventory() {

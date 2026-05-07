@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { COLLECTIONS } from '../../lib/collections';
 import type { RMAEntry } from '@aida/shared';
-import { createRecord } from '../../lib/pocketbaseApi';
+import { apiClient } from '../../lib/apiClient';
 import ModalShell from '../common/ModalShell';
 import StatusBadge from '../common/StatusBadge';
 import { formatLocalDate } from '../../utils/date';
@@ -173,7 +172,7 @@ export default function RefurbishedPromotionModal({
       const extraNotes = notes.trim();
       const serializedNotes = `--- Original RMA: ${rmaEntry.id ?? 'N/A'}\nOrder Ref: ${rmaEntry.orderNumber ?? 'N/A'}\nIMEI: ${imei || 'N/A'}\nAsking Price: ${price}\nTicket: ${rmaEntry.ticketNumber || 'N/A'} ---${extraNotes ? `\n${extraNotes}` : ''}`;
 
-      await createRecord(COLLECTIONS.REFURBISHED_DEVICES, {
+      await apiClient.post('/api/refurbished', {
         name: deviceName.trim() || rmaEntry.device || 'Refurbished Device',
         sku: normalizedSku,
         refurbishedStock: 1,

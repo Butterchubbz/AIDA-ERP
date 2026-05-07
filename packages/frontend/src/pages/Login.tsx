@@ -23,7 +23,7 @@ const Login = () => {
     setError(null);
 
     try {
-      await login(email, password, false);
+      await login(email, password);
       navigate('/'); // Redirect to dashboard on successful login
     } catch (err: unknown) {
       // For UX and tests we show a generic message rather than propagating internal error messages

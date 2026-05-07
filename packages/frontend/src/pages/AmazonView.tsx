@@ -3,8 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis,
   Tooltip, ResponsiveContainer, LabelList,
 } from 'recharts';
-import { pb } from '../lib/pocketbase';
-import { COLLECTIONS } from '../lib/collections';
+import { apiClient } from '../lib/apiClient';
 import { useAmazonPOs } from '../hooks/useShippingModules';
 import type { AmazonListing, AmazonListingVariant } from '@aida/shared';
 
@@ -54,17 +53,15 @@ function AddListingModal({ isOpen, onClose, onAdd }: AddListingModalProps) {
 
   useEffect(() => {
     if (!isOpen) return;
-    const collection =
-      itemType === 'Device' ? COLLECTIONS.INVENTORY_DEVICE : COLLECTIONS.INVENTORY_COMPONENT;
     setLoadingItems(true);
-    pb.collection(collection)
-      .getFullList({ fields: 'id,name,sku' })
+    const apiPath = itemType === 'Device' ? 'inventory/devices' : 'inventory/components';
+    apiClient.get<Array<Record<string, unknown>>>(`/api/${apiPath}?fields=id,name,sku`)
       .then(records => {
         setInventoryOptions(
           records.map(r => ({
             id: String(r.id),
-            name: String((r as Record<string, unknown>).name ?? ''),
-            sku: String((r as Record<string, unknown>).sku ?? ''),
+            name: String(r.name ?? ''),
+            sku: String(r.sku ?? ''),
           }))
         );
       })
@@ -699,17 +696,13 @@ function AmazonView() {
       const map: Record<string, number> = {};
       for (const listing of listings) {
         try {
-          const collection =
-            listing.itemType === 'Device'
-              ? COLLECTIONS.INVENTORY_DEVICE
-              : COLLECTIONS.INVENTORY_COMPONENT;
+          const apiPath =
+            listing.itemType === 'Device' ? 'inventory/devices' : 'inventory/components';
           const field = listing.itemType === 'Device' ? 'warehouseStock' : 'countedStock';
-          const record = await pb
-            .collection(collection)
-            .getOne(listing.inventoryId, { fields: `id,${field}` });
-          map[listing.id] = Number(
-            (record as unknown as Record<string, unknown>)[field] ?? 0
+          const record = await apiClient.get<Record<string, unknown>>(
+            `/api/${apiPath}/${listing.inventoryId}`
           );
+          map[listing.id] = Number(record[field] ?? 0);
         } catch {
           map[listing.id] = 0;
         }

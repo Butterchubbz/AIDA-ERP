@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { COLLECTIONS } from '../../lib/collections'
 import type { HistoryRecord } from '@aida/shared'
-import { listRecords } from '../../lib/pocketbaseApi'
+import { apiClient } from '../../lib/apiClient'
 import ModalShell from '../common/ModalShell'
 import TableShell from '../common/TableShell'
 import { formatLocalDateTime } from '../../utils/date'
@@ -24,10 +23,7 @@ export default function InventoryEventLog({
 
   useEffect(() => {
     let cancelled = false
-    listRecords<HistoryRecord>(COLLECTIONS.STOCK_HISTORY, {
-        filter: `inventoryItemId = "${itemId}"`,
-        sort: '-created',
-      })
+    apiClient.get<HistoryRecord[]>(`/api/inventory/devices/${itemId}/history`)
       .then(r => {
         if (!cancelled) {
           setRecords(r as unknown as HistoryRecord[])

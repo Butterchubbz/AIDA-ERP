@@ -26,7 +26,7 @@ const UserManagementView = () => {
     users.forEach((userItem: User) => {
       const userSpecificRoles: { [key: string]: string } = {};
       AIDA_FUNCTIONS.forEach(func => {
-        userSpecificRoles[func] = userItem.roles?.[func] || 'None';
+        userSpecificRoles[func] = (userItem.roles as Record<string, string>)?.[func] || 'None';
       });
       if (userItem.id) initialRoles[userItem.id] = userSpecificRoles;
     });

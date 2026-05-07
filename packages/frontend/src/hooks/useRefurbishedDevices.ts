@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
-import { COLLECTIONS } from '../lib/collections';
 import type { RefurbishedDevice } from '@aida/shared';
-import { updateRecord } from '../lib/pocketbaseApi';
+import { apiClient } from '../lib/apiClient';
 import { useCollectionCrud } from './useCollectionCrud';
 
 export const useRefurbishedDevices = () => {
+  const BASE = 'refurbished';
+
   const {
     items,
     loading,
@@ -14,7 +15,7 @@ export const useRefurbishedDevices = () => {
     removeItem,
     refetch,
   } = useCollectionCrud<RefurbishedDevice>({
-    collection: COLLECTIONS.REFURBISHED_DEVICES,
+    collection: BASE,
     listOptions: { sort: 'sortOrder' },
     fetchErrorMessage: 'Failed to fetch refurbished devices. Please try again.',
     addErrorMessage: 'Failed to add device.',
@@ -32,9 +33,7 @@ export const useRefurbishedDevices = () => {
           const sortOrder = i + 1;
           if (!item.id) continue;
           if ((item.sortOrder ?? 0) !== sortOrder) {
-            await updateRecord<RefurbishedDevice>(COLLECTIONS.REFURBISHED_DEVICES, item.id, {
-              sortOrder,
-            });
+            await apiClient.patch(`/api/${BASE}/${item.id}`, { sortOrder });
           }
         }
         await refetch();

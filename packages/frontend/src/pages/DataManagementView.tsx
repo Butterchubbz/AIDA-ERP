@@ -6,6 +6,7 @@ import { useComponentInventory } from '../hooks/useInventoryModules';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import CsvImportModal from '../components/modules/CsvImportModal';
+import { apiClient } from '../lib/apiClient';
 import {
   CsvFormatInstructions,
   SalesCsvInstructions,
@@ -45,7 +46,7 @@ type SalesImportRecord = {
 };
 
 const DataManagementView = () => {
-  const { user, pb } = useAuth();
+  const { user } = useAuth();
   const { inventory: deviceInventory } = useInventoryContext();
   const { componentInventory } = useComponentInventory();
   const { showToast, showMessageBox } = useMessageBox();
@@ -129,7 +130,7 @@ const DataManagementView = () => {
 
     try {
       for (const collection of availableCollections) {
-        const records = await pb.collection(collection.id).getFullList();
+        const records = await apiClient.get<unknown[]>(`/api/${collection.id}`);
         exportedData[collection.id] = records;
       }
 
@@ -171,8 +172,6 @@ const DataManagementView = () => {
       });
     });
   };
-
-  const escapeFilterValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
   // Helper to parse a JSON File into an array of records
   const parseJsonFile = async (file: File): Promise<Array<Record<string, unknown>>> => {
@@ -230,18 +229,9 @@ const DataManagementView = () => {
 
   const upsertSalesRecord = async (input: Record<string, unknown>): Promise<ImportAction> => {
     const payload = normalizeSalesRecord(input);
-    const existing = await pb.collection(COLLECTIONS.SALES_DATA).getFullList({
-      filter: `sku = "${escapeFilterValue(payload.sku)}" && year = ${payload.year} && week = ${payload.week}`,
-      fields: 'id',
-    });
-
-    if (existing.length > 0) {
-      await pb.collection(COLLECTIONS.SALES_DATA).update(existing[0].id, payload);
-      return 'updated';
-    }
-
-    await pb.collection(COLLECTIONS.SALES_DATA).create(payload);
-    return 'created';
+    // Use upsert endpoint instead
+    await apiClient.post(`/api/sales-data/upsert`, payload);
+    return 'upserted' as ImportAction;
   };
 
   const upsertInventoryRecordBySku = async (
@@ -252,22 +242,13 @@ const DataManagementView = () => {
     const sku = String(payload.sku ?? '').trim();
 
     if (!sku) {
-      await pb.collection(collectionId).create(payload);
+      await apiClient.post(`/api/${collectionId}`, payload);
       return 'created';
     }
 
-    const existing = await pb.collection(collectionId).getFullList({
-      filter: `sku = "${escapeFilterValue(sku)}"`,
-      fields: 'id',
-    });
-
-    if (existing.length > 0) {
-      await pb.collection(collectionId).update(existing[0].id, payload);
-      return 'updated';
-    }
-
-    await pb.collection(collectionId).create(payload);
-    return 'created';
+    // Use upsert by SKU endpoint
+    await apiClient.post(`/api/${collectionId}/upsert-by-sku`, { ...payload, sku });
+    return 'upserted' as ImportAction;
   };
 
   const importRecord = async (collectionId: string, input: Record<string, unknown>): Promise<ImportAction> => {
@@ -279,7 +260,7 @@ const DataManagementView = () => {
       return upsertInventoryRecordBySku(collectionId, input);
     }
 
-    await pb.collection(collectionId).create(sanitizeRecordForCreate(input));
+    await apiClient.post(`/api/${collectionId}`, sanitizeRecordForCreate(input));
     return 'created';
   };
 
@@ -463,7 +444,7 @@ const DataManagementView = () => {
         operation: 'Manual History Upload',
       };
 
-      await pb.collection(COLLECTIONS.STOCK_HISTORY).create(historyEntry);
+      await apiClient.post('/api/inventory/history', historyEntry);
       operationsCount++;
     }
 
@@ -537,11 +518,8 @@ const DataManagementView = () => {
 
     setIsClearingSales(true);
     try {
-      const records = await pb.collection(COLLECTIONS.SALES_DATA).getFullList();
-      for (const record of records) {
-        await pb.collection(COLLECTIONS.SALES_DATA).delete(record.id);
-      }
-      showToast(`Deleted ${records.length} sales records.`, 'success');
+      await apiClient.delete('/api/sales-data/all');
+      showToast('All sales data deleted.', 'success');
     } catch (error: unknown) {
       showToast(`Failed to clear sales data: ${(error as { message?: string }).message ?? String(error)}`, 'error');
     } finally {
@@ -552,14 +530,7 @@ const DataManagementView = () => {
   const handleMigrateRmaNumbers = async () => {
     setIsMigratingRma(true);
     try {
-      const records = await pb.collection(COLLECTIONS.RMA_ENTRIES).getFullList();
-      const missingTicket = records.filter(record => !record.ticketNumber || String(record.ticketNumber).trim() === '');
-      let updated = 0;
-      for (let i = 0; i < missingTicket.length; i += 1) {
-        const ticketNumber = `RMA-${String(i + 1).padStart(5, '0')}`;
-        await pb.collection(COLLECTIONS.RMA_ENTRIES).update(missingTicket[i].id, { ticketNumber });
-        updated += 1;
-      }
+      const { updated } = await apiClient.post<{ updated: number }>('/api/rma/migrate-ticket-numbers', {});
       showToast(`Migration complete. Updated ${updated} RMA entries.`, 'success');
     } catch (error: unknown) {
       showToast(`RMA migration failed: ${(error as { message?: string }).message ?? String(error)}`, 'error');
@@ -673,7 +644,6 @@ const DataManagementView = () => {
                   file={csvImportFile}
                   onClose={() => setShowCsvImportModal(false)}
                   showToast={showToast}
-                  pb={pb}
                 />
               )}
             </div>

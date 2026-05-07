@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import type PocketBase from 'pocketbase';
+import { apiClient } from '../../lib/apiClient';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ProgressBar from '../common/ProgressBar';
 import { availableCollections } from '../../lib/collections';
@@ -11,10 +11,9 @@ interface CsvImportModalProps {
   file: File;
   onClose: () => void;
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
-  pb: PocketBase;
 }
 
-const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToast, pb }) => {
+const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToast }) => {
   const [parsedData, setParsedData] = useState<Array<{ [key: string]: string }>>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -212,11 +211,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
       return;
     }
 
-    // Check authentication state
-    if (!pb.authStore.isValid) {
-      showToast('You are not authenticated. Please log in.', 'error');
-      return;
-    }
+    // Check authentication state — apiClient will redirect on 401 if needed
 
     setIsLoading(true);
     setImportProgress(0);
@@ -276,26 +271,26 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
         }
 
         if (importMode === 'create') {
-          await pb.collection(selectedCollection).create(recordData);
+          await apiClient.post(`/api/${selectedCollection}`, recordData);
         } else if (importMode === 'update') {
           if (!recordId) {
             console.warn(`Skipping row ${i + 2}: No 'id' column found for update mode.`);
             continue;
           }
-          await pb.collection(selectedCollection).update(recordId, recordData);
+          await apiClient.patch(`/api/${selectedCollection}/${recordId}`, recordData);
         } else if (importMode === 'upsert') {
           if (recordId) {
             try {
-              await pb.collection(selectedCollection).update(recordId, recordData);
+              await apiClient.patch(`/api/${selectedCollection}/${recordId}`, recordData);
             } catch (e: unknown) {
               if ((e as { status?: number }).status === 404) {
-                await pb.collection(selectedCollection).create({ id: recordId, ...(recordData as object) });
+                await apiClient.post(`/api/${selectedCollection}`, { id: recordId, ...(recordData as object) });
               } else {
                 throw e;
               }
             }
           } else {
-            await pb.collection(selectedCollection).create(recordData);
+            await apiClient.post(`/api/${selectedCollection}`, recordData);
           }
         }
         setImportProgress(Math.round(((i + 1) / parsedData.length) * 100));
@@ -444,8 +439,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
                     return;
                   }
                   const key = selectedCollection;
-                  // If authenticated, save remotely; otherwise fallback to localStorage
-                  if (pb.authStore.isValid) {
+                  // Save remotely
+                  if (true) {
                     try {
                       // If a preset with the same name exists (local or remote), confirm overwrite
                       const name = presetName.trim();
@@ -463,23 +458,6 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
                       showToast('Preset saved to server.', 'success');
                     } catch (e) {
                       showToast('Failed to save preset to server: ' + String(e), 'error');
-                    }
-                  } else {
-                    const next = { ...presets };
-                    const name = presetName.trim();
-                    if (!next[key]) next[key] = {};
-                    if (next[key][name]) {
-                      const ok = window.confirm(`A preset named "${name}" already exists. Overwrite?`);
-                      if (!ok) return;
-                    }
-                    next[key][name] = { ...columnMappings };
-                    try {
-                      localStorage.setItem('aida.mapping.presets', JSON.stringify(next));
-                      setPresets(next);
-                      setSelectedPreset(name);
-                      showToast('Preset saved.', 'success');
-                    } catch (e) {
-                      showToast('Failed to save preset: ' + String(e), 'error');
                     }
                   }
                 }}
@@ -522,7 +500,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
                   const key = selectedCollection;
                   // If remote id exists and authenticated, delete remote
                   const remoteId = remotePresetIds[key]?.[selectedPreset];
-                  if (pb.authStore.isValid && remoteId) {
+                  if (remoteId) {
                     try {
                       await deleteRemotePreset(remoteId);
                       setPresets(prev => {

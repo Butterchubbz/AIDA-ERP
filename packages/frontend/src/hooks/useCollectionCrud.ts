@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { RecordListOptions } from 'pocketbase'
-import type { CollectionName } from '../lib/pocketbaseApi'
-import { createRecord, deleteRecord, listRecords, updateRecord } from '../lib/pocketbaseApi'
+import { apiClient } from '../lib/apiClient'
 
 interface UseCollectionCrudOptions<T> {
-  collection: CollectionName
-  listOptions?: RecordListOptions
+  /** API path under /api, e.g. 'inventory/devices' */
+  collection: string
+  /** Appended as query string to GET list requests, e.g. '?sort=-updated' */
+  listOptions?: Record<string, string>
   fetchErrorMessage: string
   addErrorMessage?: string
   updateErrorMessage?: string
@@ -30,7 +30,10 @@ export function useCollectionCrud<T>({
     setLoading(true)
     setError(null)
     try {
-      const records = await listRecords<T>(collection, listOptions)
+      const qs = listOptions
+        ? '?' + new URLSearchParams(listOptions).toString()
+        : ''
+      const records = await apiClient.get<T[]>(`/api/${collection}${qs}`)
       setItems(mapRecords ? mapRecords(records) : records)
     } catch (err: unknown) {
       setError(fetchErrorMessage)
@@ -48,7 +51,7 @@ export function useCollectionCrud<T>({
     async (data: Partial<T>) => {
       setLoading(true)
       try {
-        await createRecord<T>(collection, data)
+        await apiClient.post<T>(`/api/${collection}`, data)
         await fetchItems()
       } catch (err: unknown) {
         setError(addErrorMessage)
@@ -64,7 +67,7 @@ export function useCollectionCrud<T>({
     async (id: string, data: Partial<T>) => {
       setLoading(true)
       try {
-        await updateRecord<T>(collection, id, data)
+        await apiClient.patch<T>(`/api/${collection}/${id}`, data)
         await fetchItems()
       } catch (err: unknown) {
         setError(updateErrorMessage)
@@ -80,7 +83,7 @@ export function useCollectionCrud<T>({
     async (id: string) => {
       setLoading(true)
       try {
-        await deleteRecord(collection, id)
+        await apiClient.delete(`/api/${collection}/${id}`)
         await fetchItems()
       } catch (err: unknown) {
         setError(deleteErrorMessage)

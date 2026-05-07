@@ -1,8 +1,3 @@
-import type Record from 'pocketbase';
+// Re-export User from @aida/shared for any legacy imports
+export type { User } from '@aida/shared';
 
-export interface User extends Record {
-  id?: string;
-  name: string;
-  email: string;
-  roles: { [key: string]: string };
-}
