@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { ReactNode } from 'react';
-import { hasSetupCompleted, type FirstRunStatus } from '../../lib/firstRun';
+import type { FirstRunStatus } from '../../lib/firstRun';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -19,31 +19,11 @@ const ProtectedRoute = ({ children, firstRunStatus = 'ready' }: ProtectedRoutePr
     return <Navigate to="/setup" replace />;
   }
 
-  if (!isLoggedIn) {
-    if (firstRunStatus === 'checking' && !hasSetupCompleted()) {
-      return null;
-    }
+  if (firstRunStatus === 'checking') {
+    return null;
+  }
 
-    try {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const bypassQuery = params.get('bypass') === '1';
-        const bypassLocal = (() => {
-          try {
-            return window.localStorage && window.localStorage.getItem('aida.test.bypass') === '1';
-          } catch (_err) {
-            return false;
-          }
-        })();
-        if (bypassQuery || bypassLocal) {
-          return <>{children}</>;
-        }
-      }
-    } catch (_) {
-      // ignore
-    }
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to so we can send them there after they login.
+  if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
 

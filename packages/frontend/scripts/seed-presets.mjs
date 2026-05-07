@@ -7,7 +7,7 @@ import fs from 'fs';
 // appropriate admin token if necessary.
 
 (async function main() {
-  const base = process.env.VITE_PB_URL || 'http://127.0.0.1:8090';
+  const base = process.env.PBC_URL || process.env.PB_URL || 'http://127.0.0.1:8090';
   const pb = new PocketBase(base);
 
   try {

@@ -18,7 +18,6 @@ test.describe('AIDA checklist smoke tests', () => {
 
   test('core: app loads and landing shows setup or login', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.removeItem('aida_setup_complete')
       localStorage.removeItem('pocketbase_auth')
     })
 

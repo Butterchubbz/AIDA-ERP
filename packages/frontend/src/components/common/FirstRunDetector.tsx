@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { detectFirstRun, hasSetupCompleted } from '../../lib/firstRun';
+import { detectFirstRun } from '../../lib/firstRun';
 
 export default function FirstRunDetector() {
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    if (hasSetupCompleted() || location.pathname.startsWith('/setup')) {
+    if (location.pathname.startsWith('/setup')) {
       return;
     }
 

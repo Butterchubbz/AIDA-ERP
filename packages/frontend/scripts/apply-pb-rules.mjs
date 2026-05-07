@@ -4,7 +4,7 @@
 
 import fetch from 'node-fetch';
 
-const BASE = process.env.PBC_URL || process.env.VITE_PB_URL || 'http://127.0.0.1:8090';
+const BASE = process.env.PBC_URL || process.env.PB_URL || 'http://127.0.0.1:8090';
 const TOKEN = process.env.PBC_ADMIN_TOKEN;
 const COLLECTION_NAME = 'mappingPresets';
 

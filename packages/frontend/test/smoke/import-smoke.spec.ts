@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
+import { loginThroughUi } from './smokeTestHelpers';
 
 test.setTimeout(120000);
 test('import JSON with multiple top-level arrays and preset flows', async ({ browser }) => {
   // Wait for server to be reachable via health-check before navigating
   const healthUrl = 'http://127.0.0.1:5174/health';
-  // Create a fresh context and ensure localStorage bypass is set before any navigation
+  // Create a fresh context and authenticate before opening protected routes.
   const context = await browser.newContext();
-  await context.addInitScript(() => { try { localStorage.setItem('aida.test.bypass', '1'); } catch (e) {} });
   const page = await context.newPage();
+  await loginThroughUi(page);
 
   // Capture console and page errors as early as possible
   const logs: string[] = [];
@@ -18,9 +19,9 @@ test('import JSON with multiple top-level arrays and preset flows', async ({ bro
 
   await page.waitForResponse(resp => resp.url() === healthUrl && resp.status() === 200, { timeout: 15000 }).catch(() => null);
 
-  // Serve from baseURL and include bypass query as well
+  // Serve from baseURL after authentication
   try {
-    await page.goto('/data?bypass=1', { waitUntil: 'domcontentloaded' });
+    await page.goto('/data', { waitUntil: 'domcontentloaded' });
   } catch (err) {
     console.log('Navigation failed, logs so far:\n', logs.join('\n'));
     throw err;

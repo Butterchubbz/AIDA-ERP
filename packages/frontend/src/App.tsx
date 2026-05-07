@@ -2,7 +2,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Layout from './components/common/Layout';
-import { detectFirstRun, hasSetupCompleted, type FirstRunStatus } from './lib/firstRun';
+import { detectFirstRun, type FirstRunStatus } from './lib/firstRun';
 
 const Login = React.lazy(() => import('./pages/Login'));
 const SetupPage = React.lazy(() => import('./pages/SetupPage'));
@@ -26,9 +26,7 @@ const DataManagementView = React.lazy(() => import('./pages/DataManagementView')
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 
 function App() {
-  const [firstRunStatus, setFirstRunStatus] = useState<FirstRunStatus>(() =>
-    hasSetupCompleted() ? 'ready' : 'checking'
-  );
+  const [firstRunStatus, setFirstRunStatus] = useState<FirstRunStatus>('checking');
 
   useEffect(() => {
     if (firstRunStatus !== 'checking') {
@@ -50,7 +48,7 @@ function App() {
     };
   }, [firstRunStatus]);
 
-  const holdPublicRoute = firstRunStatus === 'checking' && !hasSetupCompleted();
+  const holdPublicRoute = firstRunStatus === 'checking';
 
   return (
     <Suspense
@@ -67,7 +65,10 @@ function App() {
             firstRunStatus === 'first-run' ? <Navigate to="/setup" replace /> : holdPublicRoute ? null : <Login />
           }
         />
-        <Route path="/setup" element={<SetupPage />} />
+        <Route
+          path="/setup"
+          element={firstRunStatus === 'ready' ? <Navigate to="/login" replace /> : <SetupPage />}
+        />
         <Route
           path="/"
           element={

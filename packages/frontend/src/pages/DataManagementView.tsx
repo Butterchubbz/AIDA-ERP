@@ -541,11 +541,10 @@ const DataManagementView = () => {
 
   const rerunSetupWizard = async () => {
     const confirmed = window.confirm(
-      'This will clear setup completion and reload the app. Continue?'
+      'This will open the setup wizard so you can re-run setup checks. Continue?'
     );
     if (!confirmed) return;
-    localStorage.removeItem('aida_setup_complete');
-    window.location.href = '/';
+    window.location.href = '/setup';
   };
 
   return (

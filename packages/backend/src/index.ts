@@ -68,6 +68,11 @@ import {
   importSalesDataCSV,
 } from './routes/data.js'
 import { triggerEcommerceSync } from './routes/ecommerce.js'
+import {
+  checkSetupHealth,
+  saveEncryptionKey,
+  initCollections,
+} from './routes/setup.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -98,6 +103,13 @@ app.use(authMiddleware)
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
+
+/**
+ * Setup routes (no auth required)
+ */
+app.get('/api/setup/check-health', checkSetupHealth)
+app.post('/api/setup/save-encryption-key', saveEncryptionKey)
+app.post('/api/setup/init-collections', initCollections)
 
 /**
  * Auth routes
