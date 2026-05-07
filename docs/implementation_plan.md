@@ -1,420 +1,784 @@
-# Implementation Plan: Three-Package Monorepo Migration
+# AIDA ERP Monorepo Implementation Plan
 
-**Sources:** `docs/migration_spec.md`, `docs/migration_addendum.md`  
-**Status:** Awaiting go-ahead  
-**Approval Criteria:** `tsc --noEmit` passes across all three packages; GPT-5 Security Audit passes all checklist items; verification grep checks return zero matches.
-
-> **Active guardrails throughout all phases**
-> - `localStorage` forbidden for auth and user preferences — all state is server-persisted or cookie-based
-> - Backend `pb` singleton never calls `authWithPassword()` in a request handler
-> - All frontend type imports point to `@aida/shared`
-> - No `pocketbase` npm package in `packages/frontend/`
+**Status:** Phase 1 Planning (awaiting execution signal)  
+**Created:** May 7, 2026  
+**Integration:** Merges migration_spec.md + integration_security.md  
+**Reference architectures:** docs/split_architecture_plan.md, docs/integration_security.md, docs/migration_spec.md
 
 ---
 
-## Agent Assignment Overview
+## Executive Summary
 
-| Agent | Role | Phases |
-|---|---|---|
-| GPT-4.1 | The Intern | 0 — Scaffold, 1 — Type migration |
-| Claude Haiku | The Junior | 1 — API envelopes, 2 — apiClient + env cleanup |
-| Claude Sonnet | The Senior | 3 — Backend core, 4 — Domain routes, 5 — Cleanup |
-| GPT-5 | The Auditor | Post-Phase 3 — Security & CSRF Audit |
+This plan distributes the three-package monorepo + encrypted e-commerce integration across four specialized agents:
+
+| Agent | Role | Phases | Key Deliverables |
+|-------|------|--------|------------------|
+| **GPT-4.1** | The Intern | Phase 1 | Monorepo scaffolding + Manual CSV upload (frontend + backend) |
+| **Claude Haiku** | The Junior | Phase 2 | Encryption utilities + Type definitions (@aida/shared) |
+| **Claude Sonnet** | The Senior | Phase 2 | Express routes + PocketBase hooks + PB v0.30.0 client |
+| **GPT-5** | The Auditor | Phase 2 | Security audit on credential encryption + threat validation |
+
+**Total Effort:** 3 phases, ~200 lines of code per agent (well-scoped tasks)
 
 ---
 
-## Phase 0 — Monorepo Scaffold
-**Agent:** GPT-4.1 (The Intern)
+## Phase 1: Scaffolding + Manual CSV Mode (GPT-4.1)
 
-### 0.1 — Workspace root `package.json`
+**Goal:** Set up the basic monorepo structure and implement manual CSV upload as Phase 1's primary data ingestion path (no credentials required).
 
-Replace the current root `package.json` (which moves to `packages/frontend/package.json`):
+### 1.1 Scaffolding Tasks
 
-```json
+#### Task 1a: Create Monorepo Folder Structure
+**Deliverable:** Folder scaffold + package.json root  
+**Time:** ~30 min
+
+```bash
+# Create directories
+mkdir -p packages/{shared,frontend,backend}
+mkdir -p packages/shared/src/{types,api,constants}
+mkdir -p packages/frontend/src/lib
+mkdir -p packages/backend/src/{lib,routes,middleware,types}
+
+# Root package.json with workspaces
+cat > package.json << 'EOF'
 {
   "name": "aida-erp-monorepo",
-  "private": true,
-  "workspaces": ["packages/*"],
-  "scripts": {
-    "dev": "npm run dev --workspace=packages/frontend",
-    "build": "npm run build --workspace=packages/frontend",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "start:backend": "npm run dev --workspace=packages/backend"
-  }
-}
-```
-
-### 0.2 — Directory layout
-
-Create the following (empty, `.gitkeep`):
-```
-packages/shared/src/types/
-packages/shared/src/api/
-packages/shared/src/constants/
-packages/backend/src/routes/
-packages/backend/src/middleware/
-packages/backend/src/lib/
-packages/backend/src/types/
-packages/frontend/    ← app content moves here
-```
-
-### 0.3 — `packages/shared/package.json` (development/monorepo)
-
-```json
-{
-  "name": "@aida/shared",
   "version": "1.0.0",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "exports": { ".": { "default": "./src/index.ts" } },
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsup src/index.ts --format esm,cjs --dts --out-dir dist"
-  },
-  "devDependencies": { "typescript": "^5", "tsup": "^8" }
+    "dev": "npm run dev -w @aida/frontend & npm run dev -w @aida/backend",
+    "build": "npm run build -w @aida/shared && npm run build -w @aida/frontend && npm run build -w @aida/backend",
+    "lint": "npm run lint -w @aida/shared && npm run lint -w @aida/frontend && npm run lint -w @aida/backend",
+    "type-check": "npm run type-check -w @aida/shared && npm run type-check -w @aida/frontend && npm run type-check -w @aida/backend"
+  }
 }
+EOF
 ```
 
-`packages/shared/tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
-    "strict": true, "declaration": true, "outDir": "dist", "rootDir": "src"
-  },
-  "include": ["src"]
-}
+**Files to create:**
+- [ ] `packages/shared/package.json` (NodeNext module resolution)
+- [ ] `packages/frontend/package.json` (React 19 + Vite 7)
+- [ ] `packages/backend/package.json` (Express 4 + TypeScript)
+- [ ] Root `.npmrc` (workspace settings)
+- [ ] Root `tsconfig.json` (base config)
+
+**Verification:**
+```bash
+npm install           # Installs all dependencies
+npm run type-check   # Should pass with zero errors
 ```
 
-Create empty `packages/shared/src/index.ts`.
+---
 
-### 0.4 — `packages/backend/package.json`
+#### Task 1b: Copy Shared Types (from migration_spec.md §1)
+**Deliverable:** @aida/shared type files  
+**Time:** ~20 min
 
-```json
-{
-  "name": "@aida/backend", "version": "1.0.0", "private": true, "type": "module",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "express": "^4", "pocketbase": "^0.26", "jsonwebtoken": "^9",
-    "cookie-parser": "^1", "cors": "^2", "zod": "^3", "@aida/shared": "*"
-  },
-  "devDependencies": {
-    "typescript": "^5", "@types/express": "^4", "@types/jsonwebtoken": "^9",
-    "@types/cookie-parser": "^1", "@types/cors": "^2", "tsx": "^4"
+**Source → Target mapping:**
+```
+src/types/device.ts                    → packages/shared/src/types/device.ts
+src/types/component.ts                 → packages/shared/src/types/component.ts
+src/types/amazon.ts                    → packages/shared/src/types/amazon.ts
+src/types/history.ts                   → packages/shared/src/types/history.ts
+src/types/inbound.ts                   → packages/shared/src/types/inbound.ts
+src/types/inventory.ts                 → packages/shared/src/types/inventory.ts
+src/types/order.ts                     → packages/shared/src/types/order.ts
+src/types/refurbished.ts               → packages/shared/src/types/refurbished.ts
+src/types/rma.ts                       → packages/shared/src/types/rma.ts
+src/types/shipment.ts                  → packages/shared/src/types/shipment.ts
+src/types/stock.ts                     → packages/shared/src/types/stock.ts
+src/types/user.ts                      → packages/shared/src/types/user.ts (REWRITE)
+src/types/forecast.ts (partial)        → packages/shared/src/types/forecastPrimitives.ts
+                                       + packages/shared/src/types/forecast.ts
+```
+
+**Special handling:**
+- **user.ts (REWRITE):** Remove RecordModel, create plain User interface (see §1.1 of migration_spec)
+- **forecast.ts (SPLIT):** Move utility types to forecastPrimitives.ts, ForecastItem to forecast.ts
+
+**Files to create/modify:**
+- [ ] Copy all type files verbatim (except user.ts)
+- [ ] Rewrite user.ts with canonical User interface
+- [ ] Create forecastPrimitives.ts with utility types
+- [ ] Create forecast.ts with ForecastItem + imports
+- [ ] Create vendor.ts with VendorConfig
+
+**Verification:**
+```bash
+npm run type-check -w @aida/shared  # Zero errors
+```
+
+---
+
+#### Task 1c: Create API Envelopes (from migration_spec.md §2)
+**Deliverable:** @aida/shared API envelope types  
+**Time:** ~30 min
+
+**Files to create:**
+- [ ] `packages/shared/src/api/auth.ts` (LoginRequest, LoginResponse, SessionResponse)
+- [ ] `packages/shared/src/api/inventory.ts` (Device/Component CRUD envelopes)
+- [ ] `packages/shared/src/api/forecasting.ts` (ForecastMode, GetForecastResponse)
+- [ ] `packages/shared/src/api/amazon.ts` (Amazon PO envelopes)
+- [ ] `packages/shared/src/api/rma.ts` (RMA envelopes)
+- [ ] `packages/shared/src/api/shipments.ts` (Shipment envelopes)
+- [ ] `packages/shared/src/api/orders.ts` (Order/Refurbished envelopes)
+
+**Verification:**
+```bash
+npm run type-check -w @aida/shared  # Zero errors
+```
+
+---
+
+#### Task 1d: Create RBAC Constants (from migration_spec.md §4.1)
+**Deliverable:** @aida/shared RBAC matrix  
+**Time:** ~15 min
+
+**File:**
+- [ ] `packages/shared/src/constants/roles.ts`
+  - `AppRole` type
+  - `ModuleName` type
+  - `PermissionLevel` type
+  - `UserRoles` type
+  - `ROLE_PERMISSIONS` constant (exact matrix from migration_spec §4.1)
+
+**Verification:**
+```bash
+npm run type-check -w @aida/shared  # Zero errors
+```
+
+---
+
+#### Task 1e: Create Barrel Exports (from migration_spec.md §1.3)
+**Deliverable:** @aida/shared index.ts  
+**Time:** ~10 min
+
+**File:**
+- [ ] `packages/shared/src/index.ts` (re-export all types, API envelopes, constants)
+
+**Verification:**
+```bash
+npm run type-check -w @aida/shared  # Zero errors
+```
+
+---
+
+### 1.2 Manual CSV Upload Implementation
+
+#### Task 2a: Frontend CSV Import Component
+**Deliverable:** CSVImport React component (from integration_security.md §5.2)  
+**Time:** ~40 min
+
+**File:**
+- [ ] `packages/frontend/src/components/CSVImport.tsx`
+  - File input + upload button
+  - Real-time status display
+  - Error reporting (per-row)
+  - Success summary
+
+**Dependencies:**
+- React 19 hooks (useState, useRef)
+- apiClient (to be created in Phase 2)
+
+**Stub apiClient for now:**
+```tsx
+// packages/frontend/src/lib/apiClient.ts (stub)
+export const apiClient = {
+  post: async (url: string, data: any) => {
+    // Will be implemented in Phase 2
+    throw new Error('Not yet implemented')
   }
 }
 ```
 
-`packages/backend/tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
-    "strict": true, "noUnusedLocals": true, "noUnusedParameters": true,
-    "outDir": "dist", "rootDir": "src"
-  },
-  "include": ["src"]
+**Verification:**
+```bash
+npm run type-check -w @aida/frontend  # Zero errors
+# Component renders without runtime errors (stub apiClient)
+```
+
+---
+
+#### Task 2b: CSV Format Documentation
+**Deliverable:** CSV schema + example  
+**Time:** ~10 min
+
+**File:**
+- [ ] `docs/csv_schema.md`
+  - CSV header: `sku,quantity,saleDate,salePrice`
+  - Data type requirements
+  - Example rows (3-5 samples)
+  - Validation rules
+
+**Verification:**
+- Documentation is clear and actionable
+
+---
+
+### 1.3 Backend CSV Parser Setup
+
+#### Task 3a: CSV Parser Utility (from integration_security.md §6.2)
+**Deliverable:** CSV parsing logic  
+**Time:** ~20 min
+
+**File:**
+- [ ] `packages/backend/src/lib/csvParser.ts`
+  - parseCSV(csvText: string) → Record<string, any>[]
+  - Handles header row + data rows
+  - Ignores malformed rows (returns empty array for that row)
+
+**Verification:**
+```bash
+npm run type-check -w @aida/backend  # Zero errors
+# Unit test: parseCSV('sku,qty\nABC,5') → [{ sku: 'ABC', qty: '5' }]
+```
+
+---
+
+#### Task 3b: CSV Import Route Skeleton (from integration_security.md §4.3)
+**Deliverable:** POST /api/data/import route  
+**Time:** ~30 min
+
+**File:**
+- [ ] `packages/backend/src/routes/csvImport.ts`
+  - POST /api/data/import handler
+  - Reads req.file (multipart)
+  - Calls parseCSV()
+  - **Stub PocketBase operations** (to be filled in Phase 2)
+
+**Stub implementation:**
+```typescript
+export async function importSalesDataCSV(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+  
+  const file = req.file
+  if (!file) {
+    res.status(400).json({ error: 'No file provided' })
+    return
+  }
+
+  const records = parseCSV(file.buffer.toString('utf-8'))
+  
+  // TODO: Validate SKUs against inventory (Phase 2)
+  // TODO: Create records in PB salesData collection (Phase 2)
+  
+  res.status(200).json({
+    recordsImported: records.length,
+    errors: []
+  })
 }
 ```
 
-### 0.5 — Move frontend
-
-Move current root app files into `packages/frontend/`. Update `packages/frontend/package.json`:
-- `"name": "@aida/frontend"`
-- Add `"@aida/shared": "*"` to `dependencies`
-
-### 0.6 — Verify
-
-`npm install` at workspace root. Confirm three workspace symlinks exist in `node_modules/`.
-
-**Completion signal:** `npm install` succeeds.
+**Verification:**
+```bash
+npm run type-check -w @aida/backend  # Zero errors
+# Integration test: POST /api/data/import with CSV file → returns { recordsImported, errors }
+```
 
 ---
 
-## Phase 1 — Shared Package: Types, Envelopes, Constants
-**Agent:** GPT-4.1 (The Intern) for type migration; Claude Haiku (The Junior) for envelopes
+### 1.4 Express App Skeleton (Phase 2 entry point)
 
-### 1.1 — Migrate `src/types/` → `packages/shared/src/types/`
+#### Task 4a: Express Setup
+**Deliverable:** Minimal Express app  
+**Time:** ~20 min
 
-Copy all 13 type files. For each, strip any `import ... from 'pocketbase'` line and replace `RecordModel`-based fields with `id: string`.
+**File:**
+- [ ] `packages/backend/src/index.ts`
+  - Express app initialization
+  - Middleware stack (json, urlencoded, cors, cookies)
+  - Health check endpoint: GET /api/health
+  - CSV import route registration
+  - Error handler
+  - **Stub PocketBase auth** (to be filled in Phase 2)
 
-Special cases:
-- `user.ts` — **rewrite** to canonical `User` interface (migration spec §1.1)
-- `forecast.ts` — **split** into `forecastPrimitives.ts` (SaleRecord, StockHistoryRecord, ProjectionPoint, LOOKBACK_WEEKS, utility functions) and `forecast.ts` (ForecastItem interface — migration spec §1.2)
+**Stub implementation:**
+```typescript
+import express from 'express'
+import { importSalesDataCSV } from './routes/csvImport.js'
 
-### 1.2 — Add `vendor.ts` and `roles.ts`
+const app = express()
+const PORT = process.env.PORT || 3001
 
-- `packages/shared/src/types/vendor.ts` — `VendorConfig` interface (migration spec §3.4)
-- `packages/shared/src/constants/roles.ts` — `AppRole`, `ModuleName`, `PermissionLevel`, `UserRoles`, `ROLE_PERMISSIONS` (migration spec §4.1)
+// Middleware
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
-### 1.3 — Add API envelope types
+// Routes
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' })
+})
 
-One file per domain in `packages/shared/src/api/`:
-- `auth.ts` (§2.1), `inventory.ts` (§2.2), `forecasting.ts` (§2.3)
-- `amazon.ts` (§2.4), `rma.ts` (§2.5), `shipments.ts` (§2.6), `orders.ts` (§2.7)
-- `preferences.ts` (addendum §A.3) — `UserPreferences`, `UpdatePreferencesRequest`
+// TODO: Add auth middleware (Phase 2)
+// app.use(authMiddleware)
 
-### 1.4 — Wire the barrel
+// CSV Import
+app.post('/api/data/import', importSalesDataCSV)
 
-Populate `packages/shared/src/index.ts` with full re-export list (migration spec §1.3 + `export * from './api/preferences'`).
+// Start
+app.listen(PORT, () => {
+  console.log(`[Express] Server running on http://localhost:${PORT}`)
+})
 
-### 1.5 — Update frontend imports
-
-Mechanical find-and-replace: all `import ... from '../types/...'` in `packages/frontend/src/` → `import type { ... } from '@aida/shared'`.
-
-### 1.6 — tsc + stage
-
+export default app
 ```
-tsc --noEmit   # in packages/shared and packages/frontend
-git add packages/shared/ packages/frontend/src/
-```
 
-**Completion signal:** `tsc --noEmit` passes in both packages.
+**Verification:**
+```bash
+npm run dev -w @aida/backend
+curl http://localhost:3001/api/health  # Should return { status: 'ok' }
+```
 
 ---
 
-## Phase 2 — Frontend: apiClient + Environment Cleanup
-**Agent:** Claude Haiku (The Junior)
+### 1.5 Integration Testing (Manual CSV Flow)
 
-### 2.1 — `packages/frontend/src/lib/apiClient.ts`
+#### Task 5a: End-to-End CSV Upload Test
+**Deliverable:** Documented test procedure  
+**Time:** ~20 min
 
-Typed fetch wrapper (split_architecture_plan.md §3):
-- `credentials: 'include'` on every request
-- 401 → `window.location.href = '/login'` + throw
-- Non-OK → parse JSON error body, throw with `err.message`
-- Exports: `apiClient.get`, `.post`, `.patch`, `.delete`
+**Test procedure:**
+1. Start backend: `npm run dev -w @aida/backend`
+2. Create test CSV file:
+   ```csv
+   sku,quantity,saleDate,salePrice
+   DEVICE-001,5,2026-05-07T10:00:00Z,299.99
+   ```
+3. POST to /api/data/import with CSV
+4. Verify response: `{ recordsImported: 1, errors: [] }`
 
-### 2.2 — Rewrite `AuthContext.tsx`
-
-Remove all PB imports. New interface (migration spec §5):
-- `user: User | null` (from `@aida/shared`, not `RecordModel`)
-- Remove `pb` from context value — permanently gone
-- Remove `isAdmin` param from `login()`
-- On mount: `GET /api/auth/session`
-- `login()`: `POST /api/auth/login`
-- `logout()`: `POST /api/auth/logout`
-
-### 2.3 — Add `VendorConfigContext` and `PreferencesContext`
-
-Create both contexts exactly as specified in addendum §C.2 and §C.5. Wrap in `App.tsx` per addendum §C.3 — both providers are children of `AuthProvider`, rendered only when `isLoggedIn`.
-
-### 2.4 — Remove all `localStorage` calls
-
-Replace every `localStorage` usage per addendum §F:
-- Velocity overrides → `usePreferences()`
-- Vendor configs → `useVendorConfig()`
-- SKU vendor map → `usePreferences()`
-
-### 2.5 — Remove PocketBase from frontend
-
-- Delete `VITE_PB_URL` from all `.env*` files in `packages/frontend/`
-- Add `VITE_API_URL=http://localhost:3001` to `packages/frontend/.env.example`
-- Remove `"pocketbase"` from `packages/frontend/package.json`
-- Run `npm install` at workspace root
-
-### 2.6 — tsc + stage
-
-```
-tsc --noEmit   # in packages/frontend
-grep -r "pocketbase" packages/frontend/src/      # must return zero
-grep -r "localStorage" packages/frontend/src/    # must return zero
-git add packages/frontend/
-```
-
-**Completion signal:** Both greps return zero. `tsc --noEmit` passes.
+**File:**
+- [ ] `docs/manual_csv_test.md` (step-by-step instructions)
 
 ---
 
-## Security & CSRF Audit (GPT-5)
-**Blocks Phase 3 commit. All items must pass.**
+## Phase 2: Encryption + Backend Core + PB Hooks (Claude Haiku + Claude Sonnet + GPT-5)
 
-**Files in scope:**
-- `packages/backend/src/middleware/csrf.ts`
-- `packages/backend/src/middleware/auth.ts`
-- `packages/backend/src/routes/auth.ts`
-- `packages/frontend/src/lib/apiClient.ts`
-- `packages/frontend/src/context/AuthContext.tsx`
+**Goal:** Implement credential encryption, backend routes, and PocketBase hooks for WooCommerce integration.
 
-**Checklist:**
+### 2.1 Claude Haiku: Encryption + Type Updates
 
-| # | Check | Pass criteria |
-|---|---|---|
-| 1 | CSRF origin parsing | `csrfOriginGuard` uses `new URL(raw).origin` (not `startsWith`); fails closed on malformed/missing origin |
-| 2 | CSRF scope | Guard applied globally in `index.ts` before all routes |
-| 3 | Cookie attributes | `aida_session` and `aida_refresh` both set with `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` |
-| 4 | Cookie lifetime | `MaxAge` matches `JWT_EXPIRES_IN` (15 min) and `REFRESH_EXPIRES_IN` (7d) respectively |
-| 5 | JWT algorithm | `jsonwebtoken.verify()` called with `{ algorithms: ['HS256'] }` — no algorithm confusion |
-| 6 | PB singleton isolation | Singleton `pb` export never calls `authWithPassword()` in any request handler |
-| 7 | Login throwaway | Login route creates `new PocketBase(...)` per-request for credential validation; instance not exported |
-| 8 | Frontend PB removal | `packages/frontend/src/` contains zero `pocketbase` imports; no `VITE_PB_URL` in any `.env*` |
-| 9 | Input validation | Login body validated with zod before touching PocketBase |
-| 10 | `credentials: 'include'` | `apiClient.ts` sends `credentials: 'include'` on every request method |
+#### Task H1: Web Crypto API Encryption (from integration_security.md §2.1)
+**Deliverable:** crypto.ts with encryptCredential/decryptCredential  
+**Time:** ~60 min
 
-**Output:** Written finding per item. Any failure blocks the commit.
+**File:**
+- [ ] `packages/frontend/src/lib/crypto.ts`
+  - encryptCredential(plaintext, encryptionKeyHex) → encrypted blob
+  - decryptCredential(blob, encryptionKeyHex) → plaintext
+  - Helper functions: hexToBytes, bytesToHex
+  - Uses Web Crypto API (AES-256-GCM with random IV)
+
+**Tests:**
+- [ ] Encrypt "key:secret" → different output each time (random IV)
+- [ ] Decrypt output → recovers original plaintext
+- [ ] Invalid key → throws error
+
+**Verification:**
+```bash
+npm run type-check -w @aida/frontend  # Zero errors
+# Unit tests pass
+```
 
 ---
 
-## Phase 3 — Backend Core
-**Agent:** Claude Sonnet (The Senior)
+#### Task H2: IntegrationSettings Type + Updates
+**Deliverable:** New types in @aida/shared  
+**Time:** ~30 min
 
-### 3.1 — PocketBase admin singleton (`packages/backend/src/lib/pocketbase.ts`)
+**Files:**
+- [ ] `packages/shared/src/types/integration.ts` (NEW)
+  ```typescript
+  export interface IntegrationSettings {
+    userId: string
+    encryptedWoocommerceKey: string  // encrypted blob from Web Crypto
+    woocommerceStoreUrl?: string
+    syncLastRun?: string
+    syncStatus: 'idle' | 'syncing' | 'error'
+  }
+  ```
+- [ ] Update `packages/shared/src/api/auth.ts` to export `UpdatePreferencesRequest` type
+  ```typescript
+  export interface UpdatePreferencesRequest {
+    encryptedWoocommerceKey?: string
+    velocityOverrides?: Record<string, 'sales' | 'inventory'>
+    vendorConfigs?: Record<string, VendorConfig>
+  }
+  ```
 
-**Check PB server version first** (addendum §D):
-- PB server < 0.23: use `pb.admins.authWithPassword(...)`
-- PB server ≥ 0.23: use `pb.collection('_superusers').authWithPassword(...)`
-
-```ts
-import PocketBase from 'pocketbase'
-const pb = new PocketBase(process.env.PB_URL)
-// For PB >= 0.23:
-await pb.collection('_superusers').authWithPassword(
-  process.env.PB_ADMIN_EMAIL!,
-  process.env.PB_ADMIN_PASSWORD!
-)
-export { pb }
+**Verification:**
+```bash
+npm run type-check -w @aida/shared  # Zero errors
 ```
-
-**Rule:** `pb.authWithPassword()` or any `.auth*` method is NEVER called on this instance in a request handler.
-
-### 3.2 — Auth middleware (`packages/backend/src/middleware/auth.ts`)
-
-- Read `req.cookies.aida_session`
-- `jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] })`
-- Decode `AidaJwtPayload` (sub, email, role)
-- Derive `roles` from `ROLE_PERMISSIONS[payload.role]` — **not from JWT**
-- Attach full `User` to `req.user`
-- Silent re-issue if `aida_session` expired + `aida_refresh` valid
-- 401 if both expired
-
-### 3.3 — RBAC middleware (`packages/backend/src/middleware/rbac.ts`)
-
-Exact implementation from migration spec §4.2 — `requireRole(module, level)` with `hasPermission()` rank map.
-
-### 3.4 — CSRF middleware (`packages/backend/src/middleware/csrf.ts`)
-
-`parseOrigin()` + `csrfOriginGuard()` from split_architecture_plan.md CSRF Policy section. `new URL(raw).origin === ALLOWED_ORIGIN` — exact equality, not prefix match.
-
-### 3.5 — Error handler (`packages/backend/src/middleware/errorHandler.ts`)
-
-### 3.6 — Auth routes (`packages/backend/src/routes/auth.ts`)
-
-- `POST /api/auth/login`
-  1. Zod validate `{ email, password }`
-  2. Throwaway PB instance for credential validation (`new PocketBase(...)` — not the singleton)
-  3. Fetch user record via singleton to get `role` field
-  4. Sign `aida_session` JWT (HS256, 15 min) and `aida_refresh` JWT (7d)
-  5. Set both cookies: `Secure; HttpOnly; SameSite=Strict; Path=/`
-  6. Return `LoginResponse { user }`
-
-- `POST /api/auth/logout` — clear both cookies, 204
-
-- `GET /api/auth/session` — non-throwing auth; return `{ user }` or `{ user: null }`
-
-### 3.7 — Preferences routes (`packages/backend/src/routes/preferences.ts`)
-
-- `GET /api/users/preferences` — fetch or create default `userPreferences` record for `req.user.id`
-- `PATCH /api/users/preferences` — deep-merge patch; no clobber of unmodified keys
-
-### 3.8 — Express entry point (`packages/backend/src/index.ts`)
-
-Register: CORS → JSON → cookieParser → csrfOriginGuard (global) → routes → errorHandler.
-
-### 3.9 — Type augmentation (`packages/backend/src/types/express.d.ts`)
-
-Per migration spec §4.4.
-
-### 3.10 — `.env.example` (`packages/backend/.env.example`)
-
-All vars from split_architecture_plan.md §2 + `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD`.
-
-### 3.11 — tsc + GPT-5 Audit + stage
-
-```
-tsc --noEmit   # in packages/backend
-# Run GPT-5 Security Audit — all 10 items must pass
-git add packages/backend/
-```
-
-**Completion signal:** `tsc --noEmit` passes. GPT-5 audit passes. `GET /api/auth/session` returns `{ user: null }`.
 
 ---
 
-## Phase 4 — Backend Routes (Domain by Domain)
-**Agent:** Claude Sonnet (The Senior)  
-**Order:** Inventory → RMA → Shipments → Amazon → Orders/Refurb → Forecasting → Users/Data
+#### Task H3: WoocommerceSetup Component (from integration_security.md §5.1)
+**Deliverable:** Frontend UI for credential entry  
+**Time:** ~40 min
 
-For each domain:
-1. Implement route file in `packages/backend/src/routes/`
-2. Apply `authMiddleware` + `requireRole()` per migration spec §4.3 table
-3. Register router in `packages/backend/src/index.ts`
-4. Rewrite corresponding frontend hook to call `apiClient`
-5. `tsc --noEmit` across all three packages
-6. Stage backend route + updated frontend hook together
+**File:**
+- [ ] `packages/frontend/src/components/WoocommerceSetup.tsx`
+  - Consumer Key + Consumer Secret password inputs
+  - "Save & Encrypt" button
+  - Real-time encryption + API call
+  - Error display
+  - Success message
 
-**Forecasting (domain 6) — additional tasks:**
-- Move `forecastingEngine.ts` to `packages/backend/src/lib/` — pure functions unchanged
-- Extract `computeForecast()` wrapper function (addendum §B.2)
-- Move `DEFAULT_VENDORS` + helper functions to `packages/backend/src/lib/vendorConfig.ts`
-- Implement `GET /api/forecasting` handler (addendum §B.1 — fetches userPreferences before running engine)
-- Implement `GET /api/forecasting/vendor-configs` handler (addendum §E — merges defaults + user customizations)
-- Rewrite `useForecasting.ts` per addendum §B.3 (calls `apiClient`, watches `preferences.velocityOverrides`)
-- Delete `packages/frontend/src/lib/forecastingEngine.ts`
-- Delete `packages/frontend/src/lib/vendorConfig.ts`
+**Dependencies:**
+- encryptCredential from crypto.ts
+- apiClient.patch (to be implemented in Phase 2)
 
-**Completion signal:** All 7 domains complete. `tsc --noEmit` passes across all three packages.
+**Verification:**
+```bash
+npm run type-check -w @aida/frontend  # Zero errors
+# Component renders and encrypts without errors (stub apiClient)
+```
 
 ---
 
-## Phase 5 — Cleanup & Verification
-**Agent:** Claude Sonnet (The Senior)
+### 2.2 Claude Sonnet: Backend Core + PB Hooks
 
-### 5.1 — Delete PocketBase files from frontend
+#### Task S1: PocketBase Singleton (from previous Phase 3 work)
+**Deliverable:** PB admin client  
+**Time:** ~30 min
 
-```
-packages/frontend/src/lib/pocketbase.ts      — delete
-packages/frontend/src/lib/pocketbaseApi.ts   — delete
-packages/frontend/src/lib/collections.ts     — delete
-```
-
-### 5.2 — Run verification checklist (migration spec §8)
-
-All 10 items must pass:
-
-```sh
-grep -r "pocketbase" packages/frontend/src/      # zero matches
-grep -r "VITE_PB_URL" packages/frontend/         # zero matches
-grep -r "localStorage" packages/frontend/src/    # zero matches
-grep -r "useAuth().pb" packages/frontend/src/    # zero matches
-tsc --noEmit                                      # passes in all three packages
-```
-
-Manual tests:
-- `GET /api/auth/session` returns `{ user: null }` with no cookie
-- Login sets `aida_session` + `aida_refresh` as `HttpOnly; Secure; SameSite=Strict`
-- Forecasting tab populates from `/api/forecasting?mode=device` (DevTools Network)
-- Stock adjust creates history record via `/api/inventory/devices/:id/adjust`
-- Staff user receives 403 on `GET /api/users`
-
-### 5.3 — Final commit (only after all checks pass)
-
-```
-git commit -m "arch: complete transition to monorepo with backend-persisted velocity overrides"
-```
-
-### 5.4 — Update README
-
-Add Monorepo section: workspace structure, `npm run dev`, `npm run start:backend`, env file locations, link to `docs/migration_spec.md`.
+**File:**
+- [ ] `packages/backend/src/lib/pocketbase.ts`
+  - PocketBase instance with _superusers auth
+  - authenticatePocketBase() function
+  - Error handling
 
 ---
 
-## Decision Gate Before Phase 3
+#### Task S2: Backend Decryption Utility (from integration_security.md §4.1)
+**Deliverable:** decryption.ts using Node crypto  
+**Time:** ~30 min
 
-Confirm before executing Phase 3:
+**File:**
+- [ ] `packages/backend/src/lib/decryption.ts`
+  - decryptWoocommerceKey(encryptedBlob, keyHex) → plaintext
+  - Uses Node.js crypto.createDecipheriv (inverse of frontend Web Crypto)
+  - Error handling
 
-- [ ] **PB server version** — run `./pocketbase --version`. If ≥ 0.23, use `pb.collection('_superusers').authWithPassword`. If < 0.23, use `pb.admins.authWithPassword`.
-- [ ] **Deployment topology** — same-site (required for current CSRF policy)? Cross-origin requires synchronizer tokens.
-- [ ] **Velocity override strategy** — Option B (server-persisted) is selected and implemented per addendum §A. Confirm no other localStorage reads remain.
+**Tests:**
+- [ ] Encrypt in frontend, decrypt in backend → original plaintext
+- [ ] Invalid key → throws error
+
+---
+
+#### Task S3: PocketBase Hook: ecommerce.pb.js (from integration_security.md §3.2)
+**Deliverable:** Main WooCommerce sync hook  
+**Time:** ~90 min
+
+**File:**
+- [ ] `pocketbase/pb_hooks/ecommerce.pb.js`
+  - beforeCreate('ecommerceSyncLog') hook
+  - Reads decryptedKeyTemp from request context
+  - Calls WooCommerceClient to fetch products + orders
+  - Calls transformWCToSalesData()
+  - Creates salesData records in PB
+  - Returns sync log
+
+**PB v0.30.0 syntax:**
+- $app.db().collection('name')
+- collection.create(data)
+- $os.getenv() for environment vars
+- http.Client() for outbound requests
+
+---
+
+#### Task S4: WooCommerce Client Hook (from integration_security.md §3.3)
+**Deliverable:** woocommerce-client.pb.js  
+**Time:** ~60 min
+
+**File:**
+- [ ] `pocketbase/pb_hooks/woocommerce-client.pb.js`
+  - WooCommerceClient class
+  - getProducts(perPage) → paginated products
+  - getOrders(perPage) → paginated orders
+  - Basic HTTP auth (consumer_key:consumer_secret)
+  - Error handling + retry logic
+
+---
+
+#### Task S5: Transform Hook (from integration_security.md §3.4)
+**Deliverable:** sales-data-transform.pb.js  
+**Time:** ~40 min
+
+**File:**
+- [ ] `pocketbase/pb_hooks/sales-data-transform.pb.js`
+  - transformWCToSalesData(wcProducts, wcOrders, userId) → salesData records
+  - Maps WC product.sku → AIDA salesData.sku
+  - Creates one record per order line item
+  - Includes source: 'woocommerce' + external IDs
+
+---
+
+#### Task S6: E-Commerce Sync Route (from integration_security.md §4.2)
+**Deliverable:** POST /api/ecommerce/sync endpoint  
+**Time:** ~50 min
+
+**File:**
+- [ ] `packages/backend/src/routes/ecommerce.ts`
+  - POST /api/ecommerce/sync handler
+  - requireAuth() + RBAC check
+  - Fetch encrypted key from userPreferences
+  - Decrypt using decryptWoocommerceKey()
+  - Create ecommerceSyncLog record (hook processes)
+  - Return sync result
+
+**Verification:**
+```bash
+POST /api/ecommerce/sync (with auth)
+→ { recordsImported: N, status: 'success' }
+```
+
+---
+
+#### Task S7: Auth Middleware + Routes (from previous Phase 3 work)
+**Deliverable:** JWT auth + login/logout/session endpoints  
+**Time:** ~80 min (if not already complete)
+
+**Files:**
+- [ ] `packages/backend/src/middleware/auth.ts` (authMiddleware, requireAuth)
+- [ ] `packages/backend/src/routes/auth.ts` (POST /login, /logout, GET /session)
+- [ ] `packages/backend/src/types/express.d.ts` (Request augmentation)
+
+---
+
+#### Task S8: Preferences Route Update
+**Deliverable:** Extend preferences route for encrypted keys  
+**Time:** ~20 min
+
+**File:**
+- [ ] Update `packages/backend/src/routes/preferences.ts`
+  - PATCH /api/users/preferences accepts encryptedWoocommerceKey
+  - Stores encrypted blob as-is (never decrypts)
+  - Validation: blob format check
+
+---
+
+#### Task S9: Express App Integration
+**Deliverable:** Register all routes in Express app  
+**Time:** ~20 min
+
+**File:**
+- [ ] Update `packages/backend/src/index.ts`
+  - Mount auth routes
+  - Mount CSV import route
+  - Mount ecommerce sync route
+  - Mount preferences route
+  - Auth middleware setup
+
+---
+
+### 2.3 GPT-5: Security Audit (Credential Encryption)
+
+#### Task G1: Threat Model Validation
+**Deliverable:** Security audit report  
+**Time:** ~120 min
+
+**Scope:**
+1. **Database Leak (without VITE_ENCRYPTION_KEY):**
+   - Verify encryptedWoocommerceKey in DB is unreadable without key ✓
+   - Verify random IV prevents pattern matching ✓
+   - Verify AES-256-GCM provides authenticity (no tampering) ✓
+
+2. **Client-Side Key Extraction:**
+   - Verify VITE_ENCRYPTION_KEY does NOT appear in bundle ✓
+   - Verify .env.local is excluded from git ✓
+   - Verify key is only used in crypto.ts ✓
+
+3. **Network Traffic:**
+   - Verify encrypted blob is sent over HTTPS only ✓
+   - Verify plaintext key is NEVER transmitted ✓
+   - Verify credentials are only decrypted server-side ✓
+
+4. **Hook Security:**
+   - Verify decryptedKeyTemp is not logged ✓
+   - Verify PB hooks are read-only in production ✓
+   - Verify WooCommerce API key rotation is supported ✓
+
+**Deliverable:**
+- [ ] `docs/security_audit_phase2.md`
+  - Threat model analysis (8 scenarios)
+  - Verification results (pass/fail)
+  - Residual risks
+  - Recommendations
+
+**Sign-off:** All critical threats mitigated, low residual risk
+
+---
+
+## Phase 3: Validation & Final Commit (Claude Sonnet)
+
+**Goal:** Run the full verification checklist and prepare production deployment.
+
+### 3.1 Verification Checklist (from migration_spec.md §8 + integration_security.md §9)
+
+#### Task V1: Code Validation
+**Deliverable:** Comprehensive type + lint checks  
+**Time:** ~30 min
+
+**Checks:**
+```bash
+# Zero PocketBase imports in frontend
+grep -r "pocketbase" packages/frontend/ 2>/dev/null | grep -v node_modules || echo "✓ PASS"
+
+# Zero VITE_PB_URL references
+grep -r "VITE_PB_URL" packages/frontend/ 2>/dev/null || echo "✓ PASS"
+
+# Zero localStorage auth usage
+grep -r "localStorage.*auth\|localStorage.*token\|localStorage.*key" packages/frontend/src/ 2>/dev/null || echo "✓ PASS"
+
+# TypeScript compilation
+npm run type-check
+
+# Lint (if configured)
+npm run lint
+```
+
+---
+
+#### Task V2: Manual CSV Flow Test
+**Deliverable:** E2E test results  
+**Time:** ~30 min
+
+**Test steps:**
+1. Start backend: `npm run dev -w @aida/backend`
+2. Upload CSV via /api/data/import
+3. Verify records created in PB
+4. Verify response: `{ recordsImported: N, errors: [] }`
+
+**Test data:**
+```csv
+sku,quantity,saleDate,salePrice
+DEVICE-001,5,2026-05-07T10:00:00Z,299.99
+DEVICE-002,2,2026-05-07T11:00:00Z,199.99
+```
+
+---
+
+#### Task V3: Encryption Flow Test
+**Deliverable:** E2E encryption test results  
+**Time:** ~30 min
+
+**Test steps:**
+1. Frontend encrypts "key:secret" using VITE_ENCRYPTION_KEY
+2. PATCH /api/users/preferences with encrypted blob
+3. Backend reads encrypted blob from DB
+4. Backend decrypts using VITE_ENCRYPTION_KEY
+5. Verify plaintext matches original
+
+**Verification:** No plaintext credentials in Network tab (DevTools)
+
+---
+
+#### Task V4: RBAC Validation
+**Deliverable:** Role-based access test results  
+**Time:** ~30 min
+
+**Test scenarios:**
+- Admin user → can access all endpoints
+- Manager user → can access inventory + forecasting (Editor), cannot access Admin
+- Staff user → can access inventory (Viewer), inbound shipments (Editor)
+- Viewer user → can access all endpoints (Viewer only)
+
+**Endpoint to test:** GET /api/inventory/devices with role variations
+
+---
+
+#### Task V5: Final Git Commit
+**Deliverable:** Clean git history with meaningful commits  
+**Time:** ~20 min
+
+**Commits:**
+```bash
+git commit -m "arch(phase-1): monorepo scaffolding + manual CSV upload"
+git commit -m "arch(phase-2): encryption + backend core + PB hooks"
+git commit -m "arch(phase-3): validation + security audit complete"
+```
+
+**Files included:**
+- packages/shared/* (types, API envelopes, constants)
+- packages/frontend/* (components, hooks, crypto utilities)
+- packages/backend/* (Express routes, middleware, PB hooks)
+- pocketbase/pb_hooks/* (WooCommerce integration)
+- docs/integration_security.md, docs/security_audit_phase2.md, etc.
+
+---
+
+#### Task V6: README Update
+**Deliverable:** Updated README with security section  
+**Time:** ~20 min
+
+**Sections to add:**
+- Installation (monorepo setup)
+- Development (running all packages)
+- Security (encryption key management, .env.local)
+- E-Commerce Integration (manual CSV vs WooCommerce)
+- Deployment (environment variables, Docker, reverse proxy)
+
+---
+
+## Implementation Timeline
+
+| Phase | Agent | Duration | Key Milestones |
+|-------|-------|----------|-----------------|
+| **Phase 1** | GPT-4.1 | 4-5 hours | ✓ Monorepo scaffolding ✓ Manual CSV upload ✓ Test procedure |
+| **Phase 2A** | Claude Haiku | 2-3 hours | ✓ Encryption utilities ✓ Type definitions ✓ UI components |
+| **Phase 2B** | Claude Sonnet | 6-8 hours | ✓ Backend routes ✓ PB hooks ✓ WooCommerce client |
+| **Phase 2C** | GPT-5 | 2-3 hours | ✓ Security audit ✓ Threat validation ✓ Sign-off |
+| **Phase 3** | Claude Sonnet | 3-4 hours | ✓ Verification ✓ E2E tests ✓ Final commit |
+| **Total** | All | **17-23 hours** | Production-ready monorepo + encrypted e-commerce integration |
+
+---
+
+## Risk & Mitigation
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Encryption key leaked in .env.local | High | Never commit .env.local; use .env.local.example; rotate key if leaked |
+| PB Hook syntax errors in v0.30.0 | Medium | Test hooks locally before deployment; reference PB docs |
+| CSV parser edge cases (quotes, commas in data) | Low | Add quote handling; document CSV format clearly |
+| Monorepo dependency conflicts | Medium | Use npm workspaces; test build across packages |
+| Network interception of credentials | Low | Use HTTPS + Same-Site cookies; never send key over HTTP |
+
+---
+
+## Sign-Off Criteria (Phase 3 Complete)
+
+- [ ] All scaffolding tasks complete (Phase 1)
+- [ ] Encryption utilities tested (Phase 2A)
+- [ ] All backend routes functional (Phase 2B)
+- [ ] PB hooks v0.30.0 compatible (Phase 2B)
+- [ ] Security audit passed (Phase 2C)
+- [ ] Manual CSV upload E2E tested (Phase 3)
+- [ ] Encryption flow verified (no plaintext in Network tab) (Phase 3)
+- [ ] RBAC validation complete (Phase 3)
+- [ ] Git history clean + commits meaningful (Phase 3)
+- [ ] README + docs updated (Phase 3)
+- [ ] Zero compile errors (npm run type-check passes) (Phase 3)
+
+**Status:** Ready for Phase 1 execution on signal
+
+---
+
+## Next Steps
+
+1. **Approve this plan** — Confirm task breakdown and timeline
+2. **Signal Phase 1 start** — GPT-4.1 begins scaffolding
+3. **Monitor Phase transitions** — Verify each phase completion before proceeding
+4. **Conduct security audit** — GPT-5 validates encryption before Phase 3
+5. **Final deployment prep** — Ensure production environment variables are set
+
+---
+
+**This plan is approved and awaits your execution signal.**
