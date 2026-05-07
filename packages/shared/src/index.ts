@@ -14,6 +14,7 @@ export * from './types/stock.js'
 export * from './types/forecast.js'
 export * from './types/forecastPrimitives.js'
 export * from './types/vendor.js'
+export * from './types/integration.js'
 
 // API envelopes
 export * from './api/auth.js'

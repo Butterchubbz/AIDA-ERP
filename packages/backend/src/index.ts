@@ -67,6 +67,7 @@ import {
   deletePreset,
   importSalesDataCSV,
 } from './routes/data.js'
+import { triggerEcommerceSync } from './routes/ecommerce.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -185,6 +186,7 @@ app.get('/api/presets/:collectionId', requireAuth, listPresets)
 app.post('/api/presets/:collectionId', requireAuth, createPreset)
 app.delete('/api/presets/:recordId', requireAuth, deletePreset)
 app.post('/api/data/import', requireAuth, importSalesDataCSV)
+app.post('/api/ecommerce/sync', requireAuth, triggerEcommerceSync)
 
 /**
  * Error handler

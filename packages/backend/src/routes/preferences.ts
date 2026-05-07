@@ -24,11 +24,14 @@ export async function getPreferences(req: Request, res: Response): Promise<void>
 
     if (prefs) {
       const response: UserPreferences = {
-        userId: prefs.userId,
-        velocityOverrides: prefs.velocityOverrides || {},
-        vendorConfigs: prefs.vendorConfigs || {},
-        skuVendorMap: prefs.skuVendorMap || {},
-      }
+      userId: prefs.userId,
+      velocityOverrides: prefs.velocityOverrides || {},
+      vendorConfigs: prefs.vendorConfigs || {},
+      skuVendorMap: prefs.skuVendorMap || {},
+      ...(prefs.encryptedWoocommerceKey
+        ? { encryptedWoocommerceKey: prefs.encryptedWoocommerceKey }
+        : {}),
+    }
       res.status(200).json(response)
     } else {
       // Return default empty preferences
@@ -77,6 +80,9 @@ export async function updatePreferences(
         velocityOverrides: patch.velocityOverrides ?? existing.velocityOverrides,
         vendorConfigs: patch.vendorConfigs ?? existing.vendorConfigs,
         skuVendorMap: patch.skuVendorMap ?? existing.skuVendorMap,
+        ...(patch.encryptedWoocommerceKey !== undefined
+          ? { encryptedWoocommerceKey: patch.encryptedWoocommerceKey }
+          : {}),
       })
     } else {
       // Create new
@@ -85,6 +91,9 @@ export async function updatePreferences(
         velocityOverrides: patch.velocityOverrides || {},
         vendorConfigs: patch.vendorConfigs || {},
         skuVendorMap: patch.skuVendorMap || {},
+        ...(patch.encryptedWoocommerceKey !== undefined
+          ? { encryptedWoocommerceKey: patch.encryptedWoocommerceKey }
+          : {}),
       })
     }
 
@@ -93,6 +102,9 @@ export async function updatePreferences(
       velocityOverrides: record.velocityOverrides || {},
       vendorConfigs: record.vendorConfigs || {},
       skuVendorMap: record.skuVendorMap || {},
+      ...(record.encryptedWoocommerceKey
+        ? { encryptedWoocommerceKey: record.encryptedWoocommerceKey }
+        : {}),
     }
 
     res.status(200).json(response)
