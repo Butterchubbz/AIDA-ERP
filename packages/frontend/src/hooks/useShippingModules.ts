@@ -32,7 +32,7 @@ export function useShipments() {
     setLoading(true)
     setError(null)
     try {
-      const records = await apiClient.get<Shipment[]>('/api/shipments')
+      const records = await apiClient.get<Shipment[]>('/api/shipments/outbound')
       setShipments(records)
     } catch (error: unknown) {
       setError('Failed to fetch shipments.')

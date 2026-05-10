@@ -6,8 +6,6 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { MessageBoxProvider } from './components/common/MessageBox';
 
-import { InventoryProvider } from './context/InventoryContext';
-import { DeviceProvider } from './context/DeviceContext';
 import initSentry from './lib/sentry';
 
 (async () => {
@@ -18,11 +16,7 @@ import initSentry from './lib/sentry';
       <BrowserRouter>
         <AuthProvider>
           <MessageBoxProvider>
-            <InventoryProvider>
-              <DeviceProvider>
-                <App />
-              </DeviceProvider>
-            </InventoryProvider>
+            <App />
           </MessageBoxProvider>
         </AuthProvider>
       </BrowserRouter>
@@ -33,9 +27,10 @@ import initSentry from './lib/sentry';
   // (helps Playwright avoid racing with async in-app initialization)
   setTimeout(() => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (globalThis as any).__AIDA_APP_READY = true;
       console.info('AIDA app ready');
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, 50);

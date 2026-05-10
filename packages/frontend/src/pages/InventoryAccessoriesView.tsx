@@ -277,6 +277,7 @@ const InventoryAccessoriesView: React.FC = () => {
           isOpen={showAddItemModal || showEditItemModal}
           onClose={handleCloseModal}
           onSubmit={handleSubmitForm}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           initialData={itemToEdit as any}
           isSubmitting={isSubmitting}
         />

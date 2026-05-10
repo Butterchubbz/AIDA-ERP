@@ -15,6 +15,7 @@ const defaultPrefs: UserPreferences = {
   skuVendorMap: {},
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined)
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePreferences(): PreferencesContextType {
   const ctx = useContext(PreferencesContext)
   if (!ctx) throw new Error('usePreferences must be used inside PreferencesProvider')

@@ -3,6 +3,10 @@ import type { RefurbishedDevice } from '@aida/shared';
 import { apiClient } from '../lib/apiClient';
 import { useCollectionCrud } from './useCollectionCrud';
 
+const LIST_OPTIONS = { sort: 'sortOrder' } as const
+const mapRefurbishedRecords = (records: RefurbishedDevice[]) =>
+  [...records].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
 export const useRefurbishedDevices = () => {
   const BASE = 'refurbished';
 
@@ -16,13 +20,12 @@ export const useRefurbishedDevices = () => {
     refetch,
   } = useCollectionCrud<RefurbishedDevice>({
     collection: BASE,
-    listOptions: { sort: 'sortOrder' },
+    listOptions: LIST_OPTIONS,
     fetchErrorMessage: 'Failed to fetch refurbished devices. Please try again.',
     addErrorMessage: 'Failed to add device.',
     updateErrorMessage: 'Failed to update device.',
     deleteErrorMessage: 'Failed to delete device.',
-    mapRecords: records =>
-      [...records].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    mapRecords: mapRefurbishedRecords,
   });
 
   const reorderDevices = useCallback(

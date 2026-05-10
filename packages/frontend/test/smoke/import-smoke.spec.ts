@@ -29,6 +29,7 @@ test('import JSON with multiple top-level arrays and preset flows', async ({ bro
 
   // Wait for global readiness flag set by the app or the visible header as fallback
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const appReady = await page.waitForFunction(() => (window as any).__AIDA_APP_READY === true, { timeout: 20000 }).catch(() => null);
     if (!appReady) {
       // Fallback: wait for the Data Management heading which indicates the page mounted

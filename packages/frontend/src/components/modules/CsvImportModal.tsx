@@ -158,7 +158,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
         console.warn('Failed to load remote presets', e);
         try {
           showToast('Could not load remote presets — continuing with local presets.', 'warning');
-        } catch (toastErr) {
+        } catch {
           // showToast may be unavailable in some contexts; ignore
         }
       }
@@ -167,6 +167,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCollection]);
 
   // If user selects a different top-level key from JSON, re-run parsing using the original file
@@ -194,7 +195,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
             });
             setParsedData(normalized);
           }
-        } catch (e) {
+        } catch {
           // ignore parse failures here
         }
       })
@@ -440,25 +441,23 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ file, onClose, showToas
                   }
                   const key = selectedCollection;
                   // Save remotely
-                  if (true) {
-                    try {
-                      // If a preset with the same name exists (local or remote), confirm overwrite
-                      const name = presetName.trim();
-                      const existsLocally = !!presets[key]?.[name];
-                      const existsRemotely = !!remotePresetIds[key]?.[name];
-                      if (existsLocally || existsRemotely) {
-                        const ok = window.confirm(`A preset named "${name}" already exists. Overwrite?`);
-                        if (!ok) return;
-                      }
-                      const res = (await saveRemotePreset(key, name, { ...columnMappings })) as unknown as PresetRecord;
-                      // res may include id
-                      setPresets(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: { ...columnMappings } } }));
-                      setRemotePresetIds(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: res.id || '' } }));
-                      setSelectedPreset(name);
-                      showToast('Preset saved to server.', 'success');
-                    } catch (e) {
-                      showToast('Failed to save preset to server: ' + String(e), 'error');
+                  try {
+                    // If a preset with the same name exists (local or remote), confirm overwrite
+                    const name = presetName.trim();
+                    const existsLocally = !!presets[key]?.[name];
+                    const existsRemotely = !!remotePresetIds[key]?.[name];
+                    if (existsLocally || existsRemotely) {
+                      const ok = window.confirm(`A preset named "${name}" already exists. Overwrite?`);
+                      if (!ok) return;
                     }
+                    const res = (await saveRemotePreset(key, name, { ...columnMappings })) as unknown as PresetRecord;
+                    // res may include id
+                    setPresets(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: { ...columnMappings } } }));
+                    setRemotePresetIds(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: res.id || '' } }));
+                    setSelectedPreset(name);
+                    showToast('Preset saved to server.', 'success');
+                  } catch (e) {
+                    showToast('Failed to save preset to server: ' + String(e), 'error');
                   }
                 }}
                 className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm"

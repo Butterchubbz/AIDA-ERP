@@ -40,6 +40,7 @@ export function VendorConfigProvider({ children }: { children: React.ReactNode }
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useVendorConfig(): VendorConfigContextType {
   const ctx = useContext(VendorConfigContext)
   if (!ctx) throw new Error('useVendorConfig must be used inside VendorConfigProvider')
