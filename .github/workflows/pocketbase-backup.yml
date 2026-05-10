@@ -1,13 +1,23 @@
 name: PocketBase Backup
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
+  noop:
+    name: Noop (main branch check)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip backup on push
+        run: echo "PocketBase backup runs on manual dispatch only."
+
   backup:
+    if: github.event_name == 'workflow_dispatch'
     name: Backup PocketBase DB and storage
-    runs-on: self-hosted
-    if: runner.labels contains 'pocketbase'
+    runs-on: [self-hosted, pocketbase]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

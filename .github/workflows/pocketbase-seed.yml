@@ -1,10 +1,21 @@
 name: PocketBase Seed - mappingPresets
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
+  noop:
+    name: Noop (main branch check)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip seed on push
+        run: echo "PocketBase seed runs on manual dispatch only."
+
   seed:
+    if: github.event_name == 'workflow_dispatch'
     name: Seed PocketBase Collections
     runs-on: ubuntu-latest
     steps:

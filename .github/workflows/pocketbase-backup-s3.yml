@@ -1,13 +1,23 @@
 name: PocketBase Backup to S3
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
+  noop:
+    name: Noop (main branch check)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip backup on push
+        run: echo "PocketBase S3 backup runs on manual dispatch only."
+
   backup-to-s3:
+    if: github.event_name == 'workflow_dispatch'
     name: Backup PocketBase and upload to S3
-    runs-on: self-hosted
-    if: runner.labels contains 'pocketbase'
+    runs-on: [self-hosted, pocketbase]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

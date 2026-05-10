@@ -3,12 +3,21 @@ name: Sentry Release (source maps)
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
+  noop:
+    name: Noop (main branch check)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip heavy Sentry release on push
+        run: echo "Sentry release runs on manual dispatch only."
+
   build-and-upload:
     name: Build and upload source maps to Sentry
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
