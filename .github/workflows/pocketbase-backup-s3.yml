@@ -1,20 +1,10 @@
 name: PocketBase Backup to S3
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  noop:
-    name: Noop (main branch check)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip backup on push
-        run: echo "PocketBase S3 backup runs on manual dispatch only."
-
   backup-to-s3:
-    if: github.event_name == 'workflow_dispatch'
     name: Backup PocketBase and upload to S3
     runs-on: [self-hosted, pocketbase]
     steps:
@@ -24,7 +14,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Run pb-backup script
         env:

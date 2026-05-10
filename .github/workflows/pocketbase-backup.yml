@@ -1,20 +1,10 @@
 name: PocketBase Backup
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  noop:
-    name: Noop (main branch check)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip backup on push
-        run: echo "PocketBase backup runs on manual dispatch only."
-
   backup:
-    if: github.event_name == 'workflow_dispatch'
     name: Backup PocketBase DB and storage
     runs-on: [self-hosted, pocketbase]
     steps:
@@ -24,7 +14,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Run pb-backup script
         run: |

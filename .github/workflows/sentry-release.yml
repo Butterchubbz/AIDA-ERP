@@ -1,21 +1,11 @@
 name: Sentry Release (source maps)
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  noop:
-    name: Noop (main branch check)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip heavy Sentry release on push
-        run: echo "Sentry release runs on manual dispatch only."
-
   build-and-upload:
     name: Build and upload source maps to Sentry
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,7 +14,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install deps
         run: npm ci

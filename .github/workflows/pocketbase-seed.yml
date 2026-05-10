@@ -1,20 +1,10 @@
 name: PocketBase Seed - mappingPresets
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  noop:
-    name: Noop (main branch check)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip seed on push
-        run: echo "PocketBase seed runs on manual dispatch only."
-
   seed:
-    if: github.event_name == 'workflow_dispatch'
     name: Seed PocketBase Collections
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +14,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Run seed script
         env:
