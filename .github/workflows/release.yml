@@ -11,7 +11,6 @@ on:
 jobs:
   noop:
     name: Noop (main branch check)
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     steps:
       - name: Skip release on main push
