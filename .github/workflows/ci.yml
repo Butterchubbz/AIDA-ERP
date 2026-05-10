@@ -27,20 +27,20 @@ jobs:
         run: npm ci
 
       - name: Type-check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
-      - name: Lint (fail on warnings)
-        run: npm run lint -- --max-warnings=0
+      - name: Lint
+        run: npm run lint --workspace=packages/frontend -- --max-warnings=0
 
       - name: Run tests
-        run: npm test -- --run
+        run: npm test --workspace=packages/frontend -- --run
 
       - name: Build (production)
         run: npm run build
 
-      - name: Upload dist artifact (optional)
-        if: success() && always()
+      - name: Upload build artifact (optional)
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: packages/backend/public/
