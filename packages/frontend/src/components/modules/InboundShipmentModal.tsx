@@ -11,7 +11,7 @@ interface InboundShipmentData {
   poNumber: string;
   trackingNumber: string;
   vendor: string;
-  shipmentType: 'Air Shipment' | 'Sea Shipment';
+  shipmentType: 'Air Shipment' | 'Sea Shipment' | 'Local Supplier';
   status: string;
   notes: string;
   items: InboundShipmentItem[];
@@ -148,24 +148,26 @@ const InboundShipmentModal: React.FC<InboundShipmentModalProps> = ({
               className="p-3 border border-slate-600 rounded-lg w-full focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition duration-200 bg-slate-700 text-slate-100"
             />
           </div>
-          <div>
-            <label
-              htmlFor="tracking-number"
-              className="block text-slate-300 text-sm font-bold mb-1"
-            >
-              Tracking Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="tracking-number"
-              name="trackingNumber"
-              placeholder="Shipment Tracking Number"
-              value={modalEntryData.trackingNumber}
-              onChange={handleModalInputChange}
-              disabled={isSubmitting}
-              className="p-3 border border-slate-600 rounded-lg w-full focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition duration-200 bg-slate-700 text-slate-100"
-            />
-          </div>
+          {modalEntryData.shipmentType !== 'Local Supplier' && (
+            <div>
+              <label
+                htmlFor="tracking-number"
+                className="block text-slate-300 text-sm font-bold mb-1"
+              >
+                Tracking Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="tracking-number"
+                name="trackingNumber"
+                placeholder="Shipment Tracking Number"
+                value={modalEntryData.trackingNumber}
+                onChange={handleModalInputChange}
+                disabled={isSubmitting}
+                className="p-3 border border-slate-600 rounded-lg w-full focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition duration-200 bg-slate-700 text-slate-100"
+              />
+            </div>
+          )}
           <div className="col-span-full">
             <label htmlFor="vendor" className="block text-slate-300 text-sm font-bold mb-1">
               Vendor <span className="text-red-500">*</span>
@@ -195,6 +197,7 @@ const InboundShipmentModal: React.FC<InboundShipmentModalProps> = ({
             >
               <option value="Air Shipment">Air Shipment</option>
               <option value="Sea Shipment">Sea Shipment</option>
+              <option value="Local Supplier">Local Supplier</option>
             </select>
           </div>
           {isEditMode && (

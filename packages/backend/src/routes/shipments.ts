@@ -1,6 +1,16 @@
 import type { Request, Response } from 'express'
 import pb from '../lib/pocketbase.js'
 
+const INBOUND_SHIPMENT_TYPES = new Set(['Air Shipment', 'Sea Shipment', 'Local Supplier'])
+
+function isValidInboundShipmentType(value: unknown): value is 'Air Shipment' | 'Sea Shipment' | 'Local Supplier' {
+  return typeof value === 'string' && INBOUND_SHIPMENT_TYPES.has(value)
+}
+
+function hasTrackingNumber(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
 /**
  * GET /api/shipments/inbound
  * List all inbound shipments.
@@ -32,6 +42,17 @@ export async function createInboundShipment(req: Request, res: Response): Promis
 
   try {
     const data = req.body
+
+    if (!isValidInboundShipmentType(data?.shipmentType)) {
+      res.status(400).json({ error: 'Shipment type must be Air Shipment, Sea Shipment, or Local Supplier.' })
+      return
+    }
+
+    if (data.shipmentType !== 'Local Supplier' && !hasTrackingNumber(data?.trackingNumber)) {
+      res.status(400).json({ error: 'Tracking number is required for air and sea shipments.' })
+      return
+    }
+
     const shipment = await pb.collection('inboundShipments').create(data)
     res.status(201).json(shipment)
   } catch (err: unknown) {
@@ -53,6 +74,21 @@ export async function updateInboundShipment(req: Request, res: Response): Promis
   try {
     const { id } = req.params
     const data = req.body
+
+    const existing = await pb.collection('inboundShipments').getOne(id)
+    const effectiveShipmentType = data?.shipmentType ?? existing.shipmentType
+    const effectiveTrackingNumber = data?.trackingNumber ?? existing.trackingNumber
+
+    if (!isValidInboundShipmentType(effectiveShipmentType)) {
+      res.status(400).json({ error: 'Shipment type must be Air Shipment, Sea Shipment, or Local Supplier.' })
+      return
+    }
+
+    if (effectiveShipmentType !== 'Local Supplier' && !hasTrackingNumber(effectiveTrackingNumber)) {
+      res.status(400).json({ error: 'Tracking number is required for air and sea shipments.' })
+      return
+    }
+
     const shipment = await pb.collection('inboundShipments').update(id, data)
     res.status(200).json(shipment)
   } catch (err: unknown) {
@@ -128,7 +164,7 @@ export async function listOutboundShipments(req: Request, res: Response): Promis
   }
 
   try {
-    const shipments = await pb.collection('outboundShipments').getFullList()
+    const shipments = await pb.collection('shipments').getFullList()
     res.status(200).json(shipments)
   } catch (err: unknown) {
     console.error('[Shipments] GET outbound failed:', err)
@@ -148,7 +184,7 @@ export async function createOutboundShipment(req: Request, res: Response): Promi
 
   try {
     const data = req.body
-    const shipment = await pb.collection('outboundShipments').create(data)
+    const shipment = await pb.collection('shipments').create(data)
     res.status(201).json(shipment)
   } catch (err: unknown) {
     console.error('[Shipments] POST outbound failed:', err)
@@ -169,7 +205,7 @@ export async function updateOutboundShipment(req: Request, res: Response): Promi
   try {
     const { id } = req.params
     const data = req.body
-    const shipment = await pb.collection('outboundShipments').update(id, data)
+    const shipment = await pb.collection('shipments').update(id, data)
     res.status(200).json(shipment)
   } catch (err: unknown) {
     console.error('[Shipments] PATCH outbound failed:', err)
@@ -189,7 +225,7 @@ export async function deleteOutboundShipment(req: Request, res: Response): Promi
 
   try {
     const { id } = req.params
-    await pb.collection('outboundShipments').delete(id)
+    await pb.collection('shipments').delete(id)
     res.status(204).send()
   } catch (err: unknown) {
     console.error('[Shipments] DELETE outbound failed:', err)

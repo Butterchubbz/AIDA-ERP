@@ -71,6 +71,11 @@ const CHECKLIST_ITEMS: ChecklistItemDef[] = [
   },
 ];
 
+const LOCAL_SUPPLIER_EXCLUDED_CHECKLIST = new Set<ChecklistField>([
+  'customsDocsDownloaded',
+  'importAgentEmailed',
+]);
+
 // --- Main InboundShipmentView Component ---
 function InboundShipmentView() {
   const {
@@ -114,8 +119,14 @@ function InboundShipmentView() {
       showToast('Permission denied. You must be authenticated to add shipments.', 'error');
       return;
     }
-    if (!shipmentData.poNumber || !shipmentData.trackingNumber || !shipmentData.vendor) {
-      showToast('Please fill in PO Number, Tracking Number, and Vendor.', 'error');
+    const requiresTracking = shipmentData.shipmentType !== 'Local Supplier';
+    if (!shipmentData.poNumber || !shipmentData.vendor || (requiresTracking && !shipmentData.trackingNumber)) {
+      showToast(
+        requiresTracking
+          ? 'Please fill in PO Number, Tracking Number, and Vendor.'
+          : 'Please fill in PO Number and Vendor.',
+        'error'
+      );
       return;
     }
     setIsAddingShipment(true);
@@ -141,8 +152,14 @@ function InboundShipmentView() {
       showToast('Error: No ID provided for shipment update.', 'error');
       return;
     }
-    if (!updatedData.poNumber || !updatedData.trackingNumber || !updatedData.vendor) {
-      showToast('Please fill in PO Number, Tracking Number, and Vendor.', 'error');
+    const requiresTracking = updatedData.shipmentType !== 'Local Supplier';
+    if (!updatedData.poNumber || !updatedData.vendor || (requiresTracking && !updatedData.trackingNumber)) {
+      showToast(
+        requiresTracking
+          ? 'Please fill in PO Number, Tracking Number, and Vendor.'
+          : 'Please fill in PO Number and Vendor.',
+        'error'
+      );
       return;
     }
     setIsAddingShipment(true);
@@ -419,7 +436,10 @@ function InboundShipmentView() {
                         <div className="mb-3">
                           <p className="font-semibold text-cyan-300 mb-2">Checklist</p>
                           <div className="grid grid-cols-1 gap-2">
-                            {CHECKLIST_ITEMS.map(item => {
+                            {CHECKLIST_ITEMS.filter(item => {
+                              if (shipment.shipmentType !== 'Local Supplier') return true;
+                              return !LOCAL_SUPPLIER_EXCLUDED_CHECKLIST.has(item.field);
+                            }).map(item => {
                               const checked = Boolean(
                                 shipment[item.field as keyof typeof shipment]
                               );
@@ -545,7 +565,7 @@ function InboundShipmentView() {
                   poNumber: shipmentToEdit.poNumber ?? '',
                   trackingNumber: shipmentToEdit.trackingNumber ?? '',
                   vendor: shipmentToEdit.vendor ?? '',
-                  shipmentType: (shipmentToEdit.shipmentType as 'Air Shipment' | 'Sea Shipment') ?? 'Air Shipment',
+                  shipmentType: shipmentToEdit.shipmentType ?? 'Air Shipment',
                   status: shipmentToEdit.status ?? 'In Transit',
                   notes: shipmentToEdit.notes ?? '',
                   items: (shipmentToEdit.items || []).map(i => ({ sku: i.sku, quantity: i.quantity })),

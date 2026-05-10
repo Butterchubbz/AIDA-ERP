@@ -9,7 +9,7 @@ export interface CreateInboundRequest {
   poNumber: string
   trackingNumber: string
   vendor: string
-  shipmentType: string
+  shipmentType: 'Air Shipment' | 'Sea Shipment' | 'Local Supplier'
   status: string
   notes: string
   items: InboundShipmentItem[]
