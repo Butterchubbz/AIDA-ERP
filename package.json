@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=packages/frontend",
-    "build": "npm run build --workspace=packages/frontend",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/frontend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "start:backend": "npm run dev --workspace=packages/backend",
     "lint": "npm run lint --workspace=packages/frontend"

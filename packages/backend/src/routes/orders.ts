@@ -12,7 +12,7 @@ export async function listOrders(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const orders = await pb.collection('orders').getFullList()
+    const orders = await pb.collection('quoteApprovedOrders').getFullList()
     res.status(200).json(orders)
   } catch (err: unknown) {
     console.error('[Orders] GET orders failed:', err)
@@ -32,7 +32,7 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
 
   try {
     const data = req.body
-    const order = await pb.collection('orders').create(data)
+    const order = await pb.collection('quoteApprovedOrders').create(data)
     res.status(201).json(order)
   } catch (err: unknown) {
     console.error('[Orders] POST order failed:', err)
@@ -53,7 +53,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params
     const data = req.body
-    const order = await pb.collection('orders').update(id, data)
+    const order = await pb.collection('quoteApprovedOrders').update(id, data)
     res.status(200).json(order)
   } catch (err: unknown) {
     console.error('[Orders] PATCH order failed:', err)
@@ -73,7 +73,7 @@ export async function deleteOrder(req: Request, res: Response): Promise<void> {
 
   try {
     const { id } = req.params
-    await pb.collection('orders').delete(id)
+    await pb.collection('quoteApprovedOrders').delete(id)
     res.status(204).send()
   } catch (err: unknown) {
     console.error('[Orders] DELETE order failed:', err)

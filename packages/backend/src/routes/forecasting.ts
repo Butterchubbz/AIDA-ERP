@@ -99,9 +99,9 @@ export async function getForecast(req: Request, res: Response): Promise<void> {
 
     // Fetch all necessary data
     // TODO: Use these in actual forecast calculation
-    await pb.collection('deviceInventory').getFullList()
-    await pb.collection('componentInventory').getFullList()
-    await pb.collection('amazonInventory').getFullList().catch(() => [])
+    await pb.collection('inventoryDevice').getFullList()
+    await pb.collection('inventoryComponent').getFullList()
+    await pb.collection('amazonPOs').getFullList().catch(() => [])
     prefs?.vendorConfigs || {}
 
     // TODO: Implement actual forecast calculation based on mode, window, velocity overrides

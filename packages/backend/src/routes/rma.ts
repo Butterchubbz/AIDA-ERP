@@ -12,7 +12,7 @@ export async function listRMATickets(req: Request, res: Response): Promise<void>
   }
 
   try {
-    const tickets = await pb.collection('rmaTickets').getFullList()
+    const tickets = await pb.collection('rmaEntries').getFullList()
     res.status(200).json(tickets)
   } catch (err: unknown) {
     console.error('[RMA] GET tickets failed:', err)
@@ -32,7 +32,7 @@ export async function createRMATicket(req: Request, res: Response): Promise<void
 
   try {
     const data = req.body
-    const ticket = await pb.collection('rmaTickets').create(data)
+    const ticket = await pb.collection('rmaEntries').create(data)
     res.status(201).json(ticket)
   } catch (err: unknown) {
     console.error('[RMA] POST ticket failed:', err)
@@ -53,7 +53,7 @@ export async function updateRMATicket(req: Request, res: Response): Promise<void
   try {
     const { id } = req.params
     const data = req.body
-    const ticket = await pb.collection('rmaTickets').update(id, data)
+    const ticket = await pb.collection('rmaEntries').update(id, data)
     res.status(200).json(ticket)
   } catch (err: unknown) {
     console.error('[RMA] PATCH ticket failed:', err)
@@ -73,7 +73,7 @@ export async function deleteRMATicket(req: Request, res: Response): Promise<void
 
   try {
     const { id } = req.params
-    await pb.collection('rmaTickets').delete(id)
+    await pb.collection('rmaEntries').delete(id)
     res.status(204).send()
   } catch (err: unknown) {
     console.error('[RMA] DELETE ticket failed:', err)

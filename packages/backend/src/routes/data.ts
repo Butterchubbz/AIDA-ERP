@@ -238,7 +238,7 @@ export async function importSalesDataCSV(req: Request, res: Response): Promise<v
   // Validate SKUs exist in deviceInventory
   let knownSkus: Set<string>
   try {
-    const devices = await pb.collection('deviceInventory').getFullList({ fields: 'sku' })
+    const devices = await pb.collection('inventoryDevice').getFullList({ fields: 'sku' })
     knownSkus = new Set(devices.map((d) => (d as unknown as { sku: string }).sku))
   } catch (err: unknown) {
     console.error('[CSV Import] Failed to fetch device SKUs:', err)

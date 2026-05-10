@@ -92,7 +92,7 @@ export async function listAmazonInventory(req: Request, res: Response): Promise<
   }
 
   try {
-    const inventory = await pb.collection('amazonInventory').getFullList()
+    const inventory = await pb.collection('inventoryDevice').getFullList()
     res.status(200).json(inventory)
   } catch (err: unknown) {
     console.error('[Amazon] GET inventory failed:', err)
