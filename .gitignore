@@ -46,3 +46,6 @@ sales_data_temp.csv
 
 # Test output
 test-results/
+
+# Internal planning and architecture docs — kept local only
+docs/
