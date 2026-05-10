@@ -3,11 +3,17 @@ import { Navigate, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Layout from './components/common/Layout';
 import { detectFirstRun, type FirstRunStatus } from './lib/firstRun';
+import { useAuth } from './context/AuthContext';
+import { InventoryProvider } from './context/InventoryContext';
+import { DeviceProvider } from './context/DeviceContext';
+import { AccessoryProvider } from './context/AccessoryContext';
+import { PreferencesProvider } from './context/PreferencesContext';
 
 const Login = React.lazy(() => import('./pages/Login'));
 const SetupPage = React.lazy(() => import('./pages/SetupPage'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const InventoryDeviceView = React.lazy(() => import('./pages/InventoryDeviceView'));
+const InventoryAccessoriesView = React.lazy(() => import('./pages/InventoryAccessoriesView'));
 const InventoryComponentsView = React.lazy(() => import('./pages/InventoryComponentsView'));
 const RefurbishedDeviceView = React.lazy(() => import('./pages/RefurbishedDeviceView'));
 const DeviceForecastingView = React.lazy(() => import('./pages/DeviceForecastingView'));
@@ -23,9 +29,11 @@ const RMATrackerView = React.lazy(() => import('./pages/RMATrackerView'));
 const ProfileView = React.lazy(() => import('./pages/ProfileView'));
 const UserManagementView = React.lazy(() => import('./pages/UserManagementView'));
 const DataManagementView = React.lazy(() => import('./pages/DataManagementView'));
+const IntegrationsView = React.lazy(() => import('./pages/IntegrationsView'));
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 
 function App() {
+  const { isLoggedIn, loadingAuth } = useAuth();
   const [firstRunStatus, setFirstRunStatus] = useState<FirstRunStatus>('checking');
 
   useEffect(() => {
@@ -67,19 +75,34 @@ function App() {
         />
         <Route
           path="/setup"
-          element={firstRunStatus === 'ready' ? <Navigate to="/login" replace /> : <SetupPage />}
+          element={
+            firstRunStatus === 'checking' || loadingAuth
+              ? null
+              : firstRunStatus === 'first-run' || isLoggedIn
+              ? <SetupPage />
+              : <Navigate to="/login" replace />
+          }
         />
         <Route
           path="/"
           element={
             <ProtectedRoute firstRunStatus={firstRunStatus}>
-              <Layout />
+              <InventoryProvider>
+                <DeviceProvider>
+                  <AccessoryProvider>
+                    <PreferencesProvider>
+                      <Layout />
+                    </PreferencesProvider>
+                  </AccessoryProvider>
+                </DeviceProvider>
+              </InventoryProvider>
             </ProtectedRoute>
           }
         >
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="inventory/devices" element={<InventoryDeviceView />} />
+          <Route path="inventory/accessories" element={<InventoryAccessoriesView />} />
           <Route path="inventory/components" element={<InventoryComponentsView />} />
           <Route path="inventory/refurbished" element={<RefurbishedDeviceView />} />
           <Route path="forecasting/devices" element={<DeviceForecastingView />} />
@@ -95,6 +118,8 @@ function App() {
           <Route path="profile" element={<ProfileView />} />
           <Route path="users" element={<UserManagementView />} />
           <Route path="data" element={<DataManagementView />} />
+          <Route path="integrations" element={<IntegrationsView />} />
+          <Route path="management" element={<Navigate to="/data" replace />} />
         </Route>
         <Route
           path="*"

@@ -1,6 +1,7 @@
 // Types
 export * from './types/user.js'
 export * from './types/device.js'
+export * from './types/accessory.js'
 export * from './types/component.js'
 export * from './types/amazon.js'
 export * from './types/history.js'

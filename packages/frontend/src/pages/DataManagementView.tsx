@@ -544,7 +544,7 @@ const DataManagementView = () => {
       'This will open the setup wizard so you can re-run setup checks. Continue?'
     );
     if (!confirmed) return;
-    window.location.href = '/setup';
+    window.location.href = '/setup?rerun=1&returnTo=%2Fdata';
   };
 
   return (
@@ -836,7 +836,7 @@ const DataManagementView = () => {
           </p>
           <div className="bg-red-900/20 rounded-lg p-5 border border-red-600/50">
             <p className="text-sm text-red-100 mb-3">
-              Clear setup completion and launch setup flow again on reload.
+              Launch the setup wizard again so you can re-run checks and configuration steps.
             </p>
             <button
               onClick={rerunSetupWizard}

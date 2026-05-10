@@ -2,8 +2,8 @@ import type { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import type { SignOptions } from 'jsonwebtoken'
 import PocketBase from 'pocketbase'
-import { ROLE_PERMISSIONS } from '@aida/shared'
 import type { LoginRequest, LoginResponse } from '@aida/shared'
+import { ROLE_PERMISSIONS } from '../lib/sharedRuntime.js'
 
 /**
  * POST /api/auth/login
@@ -63,11 +63,12 @@ export async function login(req: Request, res: Response): Promise<void> {
       sessionOptions
     )
 
-    // Generate aida_refresh token (7d)
+    // Generate aida_refresh token (7d) — include role so refresh can re-issue session without a DB lookup
     const refreshToken = jwt.sign(
       {
         sub: userId,
         email: userEmail,
+        role: userRole,
         type: 'refresh',
       },
       jwtSecret,
@@ -134,4 +135,60 @@ export async function session(req: Request, res: Response): Promise<void> {
   }
 
   res.status(200).json({ user: req.user })
+}
+
+/**
+ * POST /api/auth/refresh
+ * Use the aida_refresh cookie to silently re-issue a new aida_session cookie.
+ * Called automatically by the frontend when any request returns 401.
+ */
+export async function refresh(req: Request, res: Response): Promise<void> {
+  const token = req.cookies?.aida_refresh as string | undefined
+
+  if (!token) {
+    res.status(401).json({ error: 'No refresh token' })
+    return
+  }
+
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    res.status(500).json({ error: 'JWT_SECRET not configured' })
+    return
+  }
+
+  try {
+    const payload = jwt.verify(token, secret) as {
+      sub: string
+      email: string
+      role: string
+      type: string
+    }
+
+    if (payload.type !== 'refresh') {
+      res.status(401).json({ error: 'Invalid token type' })
+      return
+    }
+
+    const refreshSessionOptions: SignOptions = {
+      expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
+    }
+
+    const sessionToken = jwt.sign(
+      { sub: payload.sub, email: payload.email, role: payload.role },
+      secret,
+      refreshSessionOptions
+    )
+
+    const isProduction = process.env.NODE_ENV === 'production'
+    res.cookie('aida_session', sessionToken, {
+      maxAge: 15 * 60 * 1000,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict',
+    })
+
+    res.status(200).json({ ok: true })
+  } catch {
+    res.status(401).json({ error: 'Session expired — please log in again' })
+  }
 }

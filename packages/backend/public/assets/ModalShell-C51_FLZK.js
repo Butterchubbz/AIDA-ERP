@@ -1,0 +1,1 @@
+import{j as e}from"./vendor-react-BON0GuxY.js";function a({children:s,panelClassName:t="w-full max-w-3xl rounded-xl border border-slate-600 bg-slate-800 p-6 text-slate-100 shadow-2xl",backdropClassName:l="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"}){return e.jsx("div",{className:l,children:e.jsx("div",{className:t,children:s})})}export{a as M};

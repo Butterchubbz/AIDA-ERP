@@ -1,7 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDeviceContext } from '../context/DeviceContext';
+import { useAccessoryContext } from '../context/AccessoryContext';
+import { useComponentInventory } from '../hooks/useInventoryModules';
 import { useAuth } from '../context/AuthContext';
 import { useMessageBox } from '../components/common/MessageBox';
+import MoveSkuModal from '../components/modules/MoveSkuModal';
 import DeviceStockCountModal from '../components/modules/DeviceStockCountModal';
 import CameraScannerModal from '../components/modules/CameraScannerModal';
 import type { StockCountUpdate } from '@aida/shared';
@@ -10,6 +13,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import type { DeviceItem } from '@aida/shared';
 import InventoryEventLog from '../components/inventory/InventoryEventLog';
+import { apiClient } from '../lib/apiClient';
 
 // --- DeviceList Component ---
 interface DeviceListProps {
@@ -18,7 +22,9 @@ interface DeviceListProps {
 }
 
 const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
-  const { devices, deleteDeviceItem, updateDeviceItem } = useDeviceContext();
+  const { devices, deleteDeviceItem, updateDeviceItem, refetch: refetchDevices } = useDeviceContext();
+  const { refetch: refetchAccessories } = useAccessoryContext();
+  const { refetch: refetchComponents } = useComponentInventory();
   const { userRoles } = useAuth();
   const { showMessageBox, showToast } = useMessageBox();
 
@@ -35,6 +41,10 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
   const [orderedDevices, setOrderedDevices] = useState<DeviceItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [userHasSorted, setUserHasSorted] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [itemToMove, setItemToMove] = useState<DeviceItem | null>(null);
+  const [isMoveLoading, setIsMoveLoading] = useState(false);
+  const [moveError, setMoveError] = useState('');
   const justDragged = React.useRef(false);
   const canAddDeleteEdit = userRoles?.Inventory === 'Editor';
 
@@ -139,6 +149,50 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
     if (confirmed) {
       await deleteDeviceItem(itemId);
       showToast(`"${itemName}" deleted successfully!`, 'success');
+    }
+  };
+
+  const handleMoveClick = (item: DeviceItem) => {
+    if (!canAddDeleteEdit) {
+      showToast('You do not have permission to move items.', 'error');
+      return;
+    }
+    setItemToMove(item);
+    setShowMoveModal(true);
+    setMoveError('');
+  };
+
+  const handleMoveConfirm = async (toCollection: 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory') => {
+    if (!itemToMove) {
+      return;
+    }
+    setIsMoveLoading(true);
+    setMoveError('');
+    try {
+      await apiClient.post('/api/inventory/sku/move', {
+        fromCollection: 'inventoryDevice',
+        toCollection,
+        itemId: itemToMove.id,
+        sku: itemToMove.sku,
+      });
+
+      showToast(`SKU "${itemToMove.sku}" moved successfully!`, 'success');
+      setShowMoveModal(false);
+      setItemToMove(null);
+
+      // Refresh the devices list and the target collection
+      await refetchDevices();
+      if (toCollection === 'inventoryAccessory') {
+        await refetchAccessories();
+      } else if (toCollection === 'inventoryComponent') {
+        await refetchComponents();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to move SKU';
+      setMoveError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsMoveLoading(false);
     }
   };
 
@@ -295,6 +349,14 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
                               {canAddDeleteEdit && (
                                 <>
                                   <button
+                                    onClick={() => handleMoveClick(item)}
+                                    className="px-3 py-1 rounded-lg border border-blue-700/30 bg-blue-900/20 text-blue-300 hover:bg-blue-700/30 hover:text-blue-100 transition-colors text-xs font-semibold shadow"
+                                    title="Move SKU to another section"
+                                  >
+                                    <i className="fas fa-exchange-alt mr-1"></i>
+                                    Move
+                                  </button>
+                                  <button
                                     onClick={() => onEditItem(item)}
                                     className="px-3 py-1 rounded-lg border border-yellow-700/30 bg-yellow-900/20 text-yellow-300 hover:bg-yellow-700/30 hover:text-yellow-100 transition-colors text-xs font-semibold shadow"
                                   >
@@ -352,6 +414,21 @@ const DeviceList: React.FC<DeviceListProps> = ({ onEditItem, onAddItem }) => {
         >
           <i className="fas fa-plus text-2xl"></i>
         </button>
+      )}
+      {showMoveModal && (
+        <MoveSkuModal
+          isOpen={showMoveModal}
+          item={itemToMove}
+          currentSection="inventoryDevice"
+          onClose={() => {
+            setShowMoveModal(false);
+            setItemToMove(null);
+            setMoveError('');
+          }}
+          onConfirm={handleMoveConfirm}
+          isLoading={isMoveLoading}
+          error={moveError}
+        />
       )}
       {showHistoryModal && selectedItemHistory && (
         <InventoryEventLog

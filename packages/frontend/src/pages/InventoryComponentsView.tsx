@@ -3,7 +3,10 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { useAuth } from '../context/AuthContext';
 import { useComponentInventory } from '../hooks/useInventoryModules';
+import { useDeviceContext } from '../context/DeviceContext';
+import { useAccessoryContext } from '../context/AccessoryContext';
 import { useMessageBox } from '../components/common/MessageBox';
+import MoveSkuModal from '../components/modules/MoveSkuModal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
 import ComponentForm from '../components/modules/ComponentForm';
@@ -13,6 +16,7 @@ import PageContainer from '../components/common/PageContainer';
 import type { ComponentItem } from '@aida/shared';
 import type { StockCountUpdate } from '@aida/shared';
 import InventoryEventLog from '../components/inventory/InventoryEventLog';
+import { apiClient } from '../lib/apiClient';
 
 // --- ComponentInventoryView Component ---
 function InventoryComponentsView() {
@@ -24,7 +28,10 @@ function InventoryComponentsView() {
     updateComponent,
     deleteComponent,
     batchUpdateComponents,
+    refetch: refetchComponents,
   } = useComponentInventory();
+  const { refetch: refetchDevices } = useDeviceContext();
+  const { refetch: refetchAccessories } = useAccessoryContext();
   const { userRoles } = useAuth();
   const { showMessageBox, showToast } = useMessageBox();
 
@@ -49,6 +56,12 @@ function InventoryComponentsView() {
   // History Modal states
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedItemHistory, setSelectedItemHistory] = useState<ComponentItem | null>(null);
+
+  // Move SKU Modal states
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [itemToMove, setItemToMove] = useState<ComponentItem | null>(null);
+  const [isMoveLoading, setIsMoveLoading] = useState(false);
+  const [moveError, setMoveError] = useState('');
 
   // Role-based permissions
   const canAddDeleteEdit = userRoles?.Inventory === 'Editor';
@@ -276,6 +289,50 @@ function InventoryComponentsView() {
     }
   };
 
+  const handleMoveClick = (item: ComponentItem) => {
+    if (!canAddDeleteEdit) {
+      showToast('You do not have permission to move items.', 'error');
+      return;
+    }
+    setItemToMove(item);
+    setShowMoveModal(true);
+    setMoveError('');
+  };
+
+  const handleMoveConfirm = async (toCollection: 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory') => {
+    if (!itemToMove) {
+      return;
+    }
+    setIsMoveLoading(true);
+    setMoveError('');
+    try {
+      await apiClient.post('/api/inventory/sku/move', {
+        fromCollection: 'inventoryComponent',
+        toCollection,
+        itemId: itemToMove.id,
+        sku: itemToMove.sku,
+      });
+
+      showToast(`SKU "${itemToMove.sku}" moved successfully!`, 'success');
+      setShowMoveModal(false);
+      setItemToMove(null);
+
+      // Refresh the components list and the target collection
+      await refetchComponents();
+      if (toCollection === 'inventoryDevice') {
+        await refetchDevices();
+      } else if (toCollection === 'inventoryAccessory') {
+        await refetchAccessories();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to move SKU';
+      setMoveError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsMoveLoading(false);
+    }
+  };
+
   const openEditModal = (item: ComponentItem) => {
     setComponentToEdit(item);
     setShowEditComponentModal(true);
@@ -485,6 +542,14 @@ function InventoryComponentsView() {
                                         {canAddDeleteEdit && (
                                           <>
                                             <button
+                                              onClick={() => handleMoveClick(item)}
+                                              className="text-blue-400 hover:text-blue-300 px-3 py-1 rounded-md border border-blue-700/30 hover:bg-blue-700/20 transition-colors text-xs font-medium"
+                                              title="Move SKU to another section"
+                                            >
+                                              <i className="fas fa-exchange-alt mr-1"></i>
+                                              Move
+                                            </button>
+                                            <button
                                               onClick={() => openEditModal(item)}
                                               className="text-yellow-400 hover:text-yellow-300 px-3 py-1 rounded-md border border-yellow-700/30 hover:bg-yellow-700/20 transition-colors text-xs font-medium"
                                             >
@@ -576,6 +641,23 @@ function InventoryComponentsView() {
             itemId={selectedItemHistory.id}
             itemName={selectedItemHistory.name}
             onClose={closeHistoryModal}
+          />
+        )}
+
+        {/* Move SKU Modal */}
+        {showMoveModal && (
+          <MoveSkuModal
+            isOpen={showMoveModal}
+            item={itemToMove}
+            currentSection="inventoryComponent"
+            onClose={() => {
+              setShowMoveModal(false);
+              setItemToMove(null);
+              setMoveError('');
+            }}
+            onConfirm={handleMoveConfirm}
+            isLoading={isMoveLoading}
+            error={moveError}
           />
         )}
       </PageContainer>

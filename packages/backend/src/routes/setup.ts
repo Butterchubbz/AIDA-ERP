@@ -11,6 +11,11 @@ interface SetupState {
   encryptionKey: SetupCheck
   userPreferences: CollectionCheck
   integrations: CollectionCheck
+  inventoryDevice: CollectionCheck
+  inventoryComponent: CollectionCheck
+  inventoryAccessory: CollectionCheck
+  stockHistory: CollectionCheck
+  wcUnknownSkus: CollectionCheck
   setupComplete: boolean
 }
 
@@ -18,7 +23,23 @@ interface SaveKeyRequest {
   key?: string
 }
 
-const ENCRYPTION_KEY_NAME = 'VITE_ENCRYPTION_KEY'
+interface SetWorkspaceModeRequest {
+  mode?: string
+}
+
+const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
+
+const REQUIRED_COLLECTIONS = [
+  'userPreferences',
+  'integrations',
+  'inventoryDevice',
+  'inventoryComponent',
+  'inventoryAccessory',
+  'stockHistory',
+  'wcUnknownSkus',
+] as const
+
+type RequiredCollection = typeof REQUIRED_COLLECTIONS[number]
 
 function getRepoRoot(): string {
   const currentFile = fileURLToPath(import.meta.url)
@@ -30,15 +51,8 @@ function getBackendEnvPath(): string {
   return path.join(getRepoRoot(), 'packages/backend/.env')
 }
 
-function getFrontendEnvPath(): string {
-  return path.join(getRepoRoot(), 'packages/frontend/.env.local')
-}
-
 function isValidEncryptionKey(value: string | undefined): value is string {
-  if (!value) {
-    return false
-  }
-
+  if (!value) return false
   return /^[0-9a-fA-F]{64}$/.test(value)
 }
 
@@ -122,9 +136,46 @@ async function createCollection(collectionName: string, fields: Array<Record<str
   }
 }
 
+async function patchMissingFields(collectionName: string, desiredFields: Array<Record<string, unknown>>): Promise<void> {
+  let collectionData: { id: string; fields?: Array<{ name: string }>; schema?: Array<{ name: string }> }
+  try {
+    collectionData = await pb.send(`/api/collections/${encodeURIComponent(collectionName)}`, { method: 'GET' })
+  } catch {
+    return
+  }
+
+  const existingNames = new Set(
+    ((collectionData.fields ?? collectionData.schema) || []).map((f) => f.name)
+  )
+  const newFields = desiredFields.filter((f) => typeof f.name === 'string' && !existingNames.has(f.name as string))
+
+  if (newFields.length === 0) {
+    return
+  }
+
+  const allFields = [
+    ...(collectionData.fields ?? collectionData.schema ?? []),
+    ...newFields,
+  ]
+
+  // Try modern `fields` key first, fall back to `schema`
+  try {
+    await pb.send(`/api/collections/${encodeURIComponent(collectionData.id)}`, {
+      method: 'PATCH',
+      body: { fields: allFields },
+    })
+  } catch {
+    await pb.send(`/api/collections/${encodeURIComponent(collectionData.id)}`, {
+      method: 'PATCH',
+      body: { schema: allFields },
+    })
+  }
+}
+
 async function ensureCollection(collectionName: string, fields: Array<Record<string, unknown>>): Promise<CollectionCheck> {
   const exists = await collectionExists(collectionName)
   if (exists) {
+    await patchMissingFields(collectionName, fields)
     return 'exists'
   }
 
@@ -132,8 +183,84 @@ async function ensureCollection(collectionName: string, fields: Array<Record<str
   return 'created'
 }
 
+// Field schemas for all required collections
+
+const userPreferencesFields: Array<Record<string, unknown>> = [
+  { name: 'userId', type: 'text', required: true },
+  { name: 'velocityOverrides', type: 'json' },
+  { name: 'vendorConfigs', type: 'json' },
+  { name: 'skuVendorMap', type: 'json' },
+  { name: 'encryptedWoocommerceKey', type: 'text' },
+  { name: 'workspaceMode', type: 'text' },
+]
+
+const integrationsFields: Array<Record<string, unknown>> = [
+  { name: 'userId', type: 'text', required: true },
+  { name: 'type', type: 'text', required: true },
+  { name: 'encryptedCredentials', type: 'text' },
+  { name: 'lastSyncAt', type: 'date' },
+  { name: 'lastSyncStatus', type: 'text' },
+  { name: 'lastSyncMessage', type: 'text' },
+  { name: 'syncIntervalHours', type: 'number' },
+]
+
+const inventoryDeviceFields: Array<Record<string, unknown>> = [
+  { name: 'name', type: 'text', required: true },
+  { name: 'sku', type: 'text', required: true },
+  { name: 'barcode', type: 'text' },
+  { name: 'webStock', type: 'number' },
+  { name: 'warehouseStock', type: 'number' },
+  { name: 'productionStock', type: 'number' },
+  { name: 'reserveStock', type: 'number' },
+  { name: 'onlineStock', type: 'number' },
+  { name: 'countedStock', type: 'number' },
+  { name: 'location', type: 'text' },
+  { name: 'quantity', type: 'number' },
+]
+
+const inventoryComponentFields: Array<Record<string, unknown>> = [
+  { name: 'name', type: 'text', required: true },
+  { name: 'sku', type: 'text', required: true },
+  { name: 'barcode', type: 'text' },
+  { name: 'onlineStock', type: 'number' },
+  { name: 'countedStock', type: 'number' },
+  { name: 'category', type: 'text' },
+  { name: 'subcategory', type: 'text' },
+]
+
+const inventoryAccessoryFields: Array<Record<string, unknown>> = [...inventoryDeviceFields]
+
+const stockHistoryFields: Array<Record<string, unknown>> = [
+  { name: 'inventoryItemId', type: 'text', required: true },
+  { name: 'timestamp', type: 'date' },
+  { name: 'field', type: 'text' },
+  { name: 'oldValue', type: 'number' },
+  { name: 'newValue', type: 'number' },
+  { name: 'change', type: 'number' },
+  { name: 'changedByEmail', type: 'text' },
+  { name: 'operation', type: 'text' },
+]
+
+const wcUnknownSkusFields: Array<Record<string, unknown>> = [
+  { name: 'sku', type: 'text', required: true },
+  { name: 'productName', type: 'text' },
+  { name: 'wcStock', type: 'number' },
+  { name: 'seenAt', type: 'date' },
+  { name: 'dismissed', type: 'bool' },
+]
+
+const COLLECTION_FIELDS: Record<RequiredCollection, Array<Record<string, unknown>>> = {
+  userPreferences: userPreferencesFields,
+  integrations: integrationsFields,
+  inventoryDevice: inventoryDeviceFields,
+  inventoryComponent: inventoryComponentFields,
+  inventoryAccessory: inventoryAccessoryFields,
+  stockHistory: stockHistoryFields,
+  wcUnknownSkus: wcUnknownSkusFields,
+}
+
 async function evaluateSetupState(): Promise<SetupState> {
-  const encryptionKeyStatus: SetupCheck = isValidEncryptionKey(process.env.VITE_ENCRYPTION_KEY)
+  const encryptionKeyStatus: SetupCheck = isValidEncryptionKey(process.env.AIDA_ENCRYPTION_KEY)
     ? 'ok'
     : process.env.VITE_ENCRYPTION_KEY
       ? 'invalid'
@@ -142,34 +269,42 @@ async function evaluateSetupState(): Promise<SetupState> {
   try {
     await ensurePocketBaseAuth()
   } catch {
+    const failed: Record<string, CollectionCheck> = {}
+    for (const name of REQUIRED_COLLECTIONS) {
+      failed[name] = 'failed'
+    }
     return {
       encryptionKey: encryptionKeyStatus,
-      userPreferences: 'failed',
-      integrations: 'failed',
+      ...(failed as Pick<SetupState, 'userPreferences' | 'integrations' | 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory' | 'stockHistory' | 'wcUnknownSkus'>),
       setupComplete: false,
     }
   }
 
-  let userPreferencesStatus: CollectionCheck = 'missing'
-  let integrationsStatus: CollectionCheck = 'missing'
+  const collectionStatuses: Partial<Record<RequiredCollection, CollectionCheck>> = {}
 
-  try {
-    userPreferencesStatus = (await collectionExists('userPreferences')) ? 'exists' : 'missing'
-    integrationsStatus = (await collectionExists('integrations')) ? 'exists' : 'missing'
-  } catch {
-    userPreferencesStatus = 'failed'
-    integrationsStatus = 'failed'
+  for (const name of REQUIRED_COLLECTIONS) {
+    try {
+      collectionStatuses[name] = (await collectionExists(name)) ? 'exists' : 'missing'
+    } catch {
+      collectionStatuses[name] = 'failed'
+    }
   }
 
-  const setupComplete =
-    encryptionKeyStatus === 'ok' &&
-    userPreferencesStatus === 'exists' &&
-    integrationsStatus === 'exists'
+  const allCollectionsExist = REQUIRED_COLLECTIONS.every(
+    (name) => collectionStatuses[name] === 'exists'
+  )
+
+  const setupComplete = encryptionKeyStatus === 'ok' && allCollectionsExist
 
   return {
     encryptionKey: encryptionKeyStatus,
-    userPreferences: userPreferencesStatus,
-    integrations: integrationsStatus,
+    userPreferences: collectionStatuses.userPreferences ?? 'failed',
+    integrations: collectionStatuses.integrations ?? 'failed',
+    inventoryDevice: collectionStatuses.inventoryDevice ?? 'failed',
+    inventoryComponent: collectionStatuses.inventoryComponent ?? 'failed',
+    inventoryAccessory: collectionStatuses.inventoryAccessory ?? 'failed',
+    stockHistory: collectionStatuses.stockHistory ?? 'failed',
+    wcUnknownSkus: collectionStatuses.wcUnknownSkus ?? 'failed',
     setupComplete,
   }
 }
@@ -198,13 +333,18 @@ export async function checkSetupHealth(_req: Request, res: Response): Promise<vo
       encryptionKey: setup.encryptionKey,
       userPreferences: setup.userPreferences,
       integrations: setup.integrations,
+      inventoryDevice: setup.inventoryDevice,
+      inventoryComponent: setup.inventoryComponent,
+      inventoryAccessory: setup.inventoryAccessory,
+      stockHistory: setup.stockHistory,
+      wcUnknownSkus: setup.wcUnknownSkus,
     },
   })
 }
 
 /**
  * POST /api/setup/save-encryption-key
- * Persists the generated key to backend and frontend local env files.
+ * Persists the generated key to backend local env file.
  */
 export async function saveEncryptionKey(req: Request, res: Response): Promise<void> {
   const body = req.body as SaveKeyRequest
@@ -217,8 +357,7 @@ export async function saveEncryptionKey(req: Request, res: Response): Promise<vo
 
   try {
     await upsertEnvVariable(getBackendEnvPath(), ENCRYPTION_KEY_NAME, key)
-    await upsertEnvVariable(getFrontendEnvPath(), ENCRYPTION_KEY_NAME, key)
-    process.env.VITE_ENCRYPTION_KEY = key
+    process.env.AIDA_ENCRYPTION_KEY = key
     res.status(200).json({ status: 'saved' })
   } catch (err: unknown) {
     console.error('[Setup] Failed to save encryption key:', err)
@@ -228,7 +367,7 @@ export async function saveEncryptionKey(req: Request, res: Response): Promise<vo
 
 /**
  * POST /api/setup/init-collections
- * Creates required setup collections when they are missing.
+ * Creates all required PocketBase collections when missing.
  */
 export async function initCollections(_req: Request, res: Response): Promise<void> {
   try {
@@ -239,44 +378,58 @@ export async function initCollections(_req: Request, res: Response): Promise<voi
     return
   }
 
-  const userPreferencesFields: Array<Record<string, unknown>> = [
-    { name: 'userId', type: 'text', required: true },
-    { name: 'velocityOverrides', type: 'json' },
-    { name: 'vendorConfigs', type: 'json' },
-    { name: 'skuVendorMap', type: 'json' },
-    { name: 'encryptedWoocommerceKey', type: 'text' },
-  ]
+  const results: Partial<Record<RequiredCollection, CollectionCheck>> = {}
 
-  const integrationsFields: Array<Record<string, unknown>> = [
-    { name: 'userId', type: 'text', required: true },
-    { name: 'encryptedWoocommerceKey', type: 'text' },
-    { name: 'woocommerceStoreUrl', type: 'text' },
-    { name: 'syncLastRun', type: 'date' },
-    { name: 'syncStatus', type: 'text' },
-  ]
-
-  let userPreferences: CollectionCheck = 'failed'
-  let integrations: CollectionCheck = 'failed'
-
-  try {
-    userPreferences = await ensureCollection('userPreferences', userPreferencesFields)
-  } catch (err: unknown) {
-    console.error('[Setup] Failed ensuring userPreferences:', err)
-    userPreferences = 'failed'
+  for (const name of REQUIRED_COLLECTIONS) {
+    try {
+      results[name] = await ensureCollection(name, COLLECTION_FIELDS[name])
+    } catch (err: unknown) {
+      console.error(`[Setup] Failed ensuring ${name}:`, err)
+      results[name] = 'failed'
+    }
   }
 
-  try {
-    integrations = await ensureCollection('integrations', integrationsFields)
-  } catch (err: unknown) {
-    console.error('[Setup] Failed ensuring integrations:', err)
-    integrations = 'failed'
-  }
-
-  const complete = userPreferences !== 'failed' && integrations !== 'failed'
+  const complete = REQUIRED_COLLECTIONS.every(
+    (name) => results[name] === 'exists' || results[name] === 'created'
+  )
 
   res.status(200).json({
-    userPreferences,
-    integrations,
+    ...results,
     complete,
   })
+}
+
+/**
+ * POST /api/setup/set-workspace-mode
+ * Saves Solo or Team mode to a system-level userPreferences record.
+ * Called during setup wizard before user login exists.
+ */
+export async function setWorkspaceMode(req: Request, res: Response): Promise<void> {
+  const body = req.body as SetWorkspaceModeRequest
+  const mode = body.mode
+
+  if (mode !== 'solo' && mode !== 'team') {
+    res.status(400).json({ error: 'mode must be "solo" or "team"' })
+    return
+  }
+
+  try {
+    await ensurePocketBaseAuth()
+
+    const existing = await pb
+      .collection('userPreferences')
+      .getFirstListItem('userId = "system"', { requestKey: null })
+      .catch(() => null)
+
+    if (existing) {
+      await pb.collection('userPreferences').update(existing.id, { workspaceMode: mode })
+    } else {
+      await pb.collection('userPreferences').create({ userId: 'system', workspaceMode: mode })
+    }
+
+    res.status(200).json({ mode })
+  } catch (err: unknown) {
+    console.error('[Setup] setWorkspaceMode failed:', err)
+    res.status(500).json({ error: 'Failed to save workspace mode' })
+  }
 }

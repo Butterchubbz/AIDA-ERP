@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { DeviceItem } from '@aida/shared'
 import type { ComponentItem } from '@aida/shared'
+import type { AccessoryItem } from '@aida/shared'
 import { apiClient } from '../lib/apiClient'
 
 interface BaseInventoryItem {
@@ -15,6 +16,28 @@ interface CreateInventoryHookOptions<T extends BaseInventoryItem> {
   /** API sub-path under /api, e.g. 'inventory/devices' */
   apiPath: string
   stockField: keyof T
+  sortItems?: (items: T[]) => T[]
+}
+
+function sortInventoryBySku<T extends BaseInventoryItem>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const normalizedSkuCompare = a.sku.trim().toLowerCase().localeCompare(b.sku.trim().toLowerCase())
+    if (normalizedSkuCompare !== 0) {
+      return normalizedSkuCompare
+    }
+
+    const rawSkuCompare = a.sku.localeCompare(b.sku)
+    if (rawSkuCompare !== 0) {
+      return rawSkuCompare
+    }
+
+    const createdCompare = (a.created ?? '').localeCompare(b.created ?? '')
+    if (createdCompare !== 0) {
+      return createdCompare
+    }
+
+    return a.id.localeCompare(b.id)
+  })
 }
 
 function createInventoryHook<T extends BaseInventoryItem>(options: CreateInventoryHookOptions<T>) {
@@ -28,7 +51,7 @@ function createInventoryHook<T extends BaseInventoryItem>(options: CreateInvento
       setError(null)
       try {
         const records = await apiClient.get<T[]>(`/api/${options.apiPath}`)
-        setItems(records)
+        setItems(options.sortItems ? options.sortItems(records) : records)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to fetch items'
         setError(msg)
@@ -46,7 +69,7 @@ function createInventoryHook<T extends BaseInventoryItem>(options: CreateInvento
       setLoading(true)
       try {
         const record = await apiClient.post<T>(`/api/${options.apiPath}`, data)
-        setItems(prev => [...prev, record])
+        setItems(prev => (options.sortItems ? options.sortItems([...prev, record]) : [...prev, record]))
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to add'
         setError(msg)
@@ -61,7 +84,10 @@ function createInventoryHook<T extends BaseInventoryItem>(options: CreateInvento
       async (id: string, data: Partial<T>) => {
         try {
           const result = await apiClient.patch<T>(`/api/${options.apiPath}/${id}`, data)
-          setItems(prev => prev.map(item => (item.id === id ? result : item)))
+          setItems(prev => {
+            const updated = prev.map(item => (item.id === id ? result : item))
+            return options.sortItems ? options.sortItems(updated) : updated
+          })
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : 'Failed to update'
           setError(msg)
@@ -109,11 +135,13 @@ function createInventoryHook<T extends BaseInventoryItem>(options: CreateInvento
 const useDeviceInventoryBase = createInventoryHook<DeviceItem>({
   apiPath: 'inventory/devices',
   stockField: 'warehouseStock',
+  sortItems: sortInventoryBySku,
 })
 
 const useComponentInventoryBase = createInventoryHook<ComponentItem>({
   apiPath: 'inventory/components',
   stockField: 'countedStock',
+  sortItems: sortInventoryBySku,
 })
 
 export function useDeviceInventory() {
@@ -143,5 +171,26 @@ export function useComponentInventory() {
     deleteComponent: base.deleteItem,
     batchUpdateComponents: base.batchUpdate,
     setComponents: base.setItems,
+  }
+}
+
+const useAccessoryInventoryBase = createInventoryHook<AccessoryItem>({
+  apiPath: 'inventory/accessories',
+  stockField: 'warehouseStock',
+  sortItems: sortInventoryBySku,
+})
+
+export function useAccessoryInventory() {
+  const base = useAccessoryInventoryBase()
+  return {
+    accessories: base.items,
+    loading: base.loading,
+    error: base.error,
+    refetch: base.refetch,
+    addAccessoryItem: base.addItem,
+    updateAccessoryItem: base.updateItem,
+    deleteAccessoryItem: base.deleteItem,
+    batchUpdateAccessories: base.batchUpdate,
+    setAccessories: base.setItems,
   }
 }

@@ -14,7 +14,16 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
   );
 
   const isOrdersPathActive = useCallback(
-    () => isPathActive('/orders') || isPathActive('/quotes'),
+    () => isPathActive('/orders') || isPathActive('/quotes') || isPathActive('/inventory/rma'),
+    [isPathActive]
+  );
+
+  const isManagementPathActive = useCallback(
+    () =>
+      isPathActive('/profile') ||
+      isPathActive('/integrations') ||
+      isPathActive('/users') ||
+      isPathActive('/data'),
     [isPathActive]
   );
 
@@ -22,13 +31,15 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
   const [isForecastingOpen, setForecastingOpen] = useState(isPathActive('/forecasting'));
   const [isAmazonOpen, setAmazonOpen] = useState(isPathActive('/amazon'));
   const [isOrdersOpen, setOrdersOpen] = useState(isOrdersPathActive());
+  const [isManagementOpen, setManagementOpen] = useState(isManagementPathActive());
 
   useEffect(() => {
     setInventoryOpen(isPathActive('/inventory'));
     setForecastingOpen(isPathActive('/forecasting'));
     setAmazonOpen(isPathActive('/amazon'));
     setOrdersOpen(isOrdersPathActive());
-  }, [isOrdersPathActive, isPathActive]);
+    setManagementOpen(isManagementPathActive());
+  }, [isOrdersPathActive, isPathActive, isManagementPathActive]);
 
   const baseLinkClasses =
     'w-full text-left px-4 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center';
@@ -77,6 +88,11 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
                   <li>
                     <NavLink to="/inventory/devices" className={getSubNavLinkClass}>
                       Devices
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink to="/inventory/accessories" className={getSubNavLinkClass}>
+                      Accessories
                     </NavLink>
                   </li>
                   <li>
@@ -171,7 +187,8 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.Orders && userRoles.Orders !== 'None' && (
+          {((userRoles?.Orders && userRoles.Orders !== 'None') ||
+            (userRoles?.['RMA Tracker'] && userRoles['RMA Tracker'] !== 'None')) && (
             <li>
               <button
                 onClick={() => setOrdersOpen(!isOrdersOpen)}
@@ -181,17 +198,26 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
               >
                 <span className="flex items-center">
                   <i className="fas fa-book-open w-5 h-5 flex-shrink-0 mr-3"></i>
-                  <span>Orders</span>
+                  <span>Orders & RMA</span>
                 </span>
                 <i className={`fas fa-chevron-down transition-transform ${isOrdersOpen ? 'rotate-180' : ''}`}></i>
               </button>
               {isOrdersOpen && (
                 <ul className="mt-2 space-y-2">
-                  <li>
-                    <NavLink to="/quotes/approved" className={getSubNavLinkClass}>
-                      Quote Approved
-                    </NavLink>
-                  </li>
+                  {userRoles?.Orders && userRoles.Orders !== 'None' && (
+                    <li>
+                      <NavLink to="/quotes/approved" className={getSubNavLinkClass}>
+                        Quote Approved
+                      </NavLink>
+                    </li>
+                  )}
+                  {userRoles?.['RMA Tracker'] && userRoles['RMA Tracker'] !== 'None' && (
+                    <li>
+                      <NavLink to="/inventory/rma" className={getSubNavLinkClass}>
+                        RMA Tracker
+                      </NavLink>
+                    </li>
+                  )}
                 </ul>
               )}
             </li>
@@ -208,50 +234,49 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.['RMA Tracker'] && userRoles['RMA Tracker'] !== 'None' && (
-            <li>
-              <NavLink to="/inventory/rma" className={getNavLinkClass}>
-                <span className="flex items-center gap-3">
-                  <i className="fas fa-rotate-left w-5 h-5 flex-shrink-0"></i>
-                  <span>RMA / Returns</span>
-                </span>
-              </NavLink>
-            </li>
-          )}
-
           <div className="border-t border-slate-700 my-2"></div>
           <li>
-            <NavLink to="/profile" className={getNavLinkClass}>
-              <span className="flex items-center gap-3">
-                <i className="fas fa-user w-5 h-5 flex-shrink-0"></i>
-                <span>My Profile</span>
+            <button
+              onClick={() => setManagementOpen(!isManagementOpen)}
+              className={`${baseLinkClasses} justify-between ${
+                isManagementPathActive() ? 'text-white' : 'text-slate-300'
+              }`}
+            >
+              <span className="flex items-center">
+                <i className="fas fa-gear w-5 h-5 flex-shrink-0 mr-3"></i>
+                <span>AIDA Management</span>
               </span>
-            </NavLink>
+              <i className={`fas fa-chevron-down transition-transform ${isManagementOpen ? 'rotate-180' : ''}`}></i>
+            </button>
+            {isManagementOpen && (
+              <ul className="mt-2 space-y-2">
+                <li>
+                  <NavLink to="/profile" className={getSubNavLinkClass}>
+                    My Profile
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/integrations" className={getSubNavLinkClass}>
+                    Integrations
+                  </NavLink>
+                </li>
+                {isTeam && (userRoles?.Admin === 'Editor' || userRoles?.Admin === 'Admin') && (
+                  <li>
+                    <NavLink to="/users" className={getSubNavLinkClass}>
+                      User Management
+                    </NavLink>
+                  </li>
+                )}
+                {userRoles?.Admin === 'Editor' && (
+                  <li>
+                    <NavLink to="/data" className={getSubNavLinkClass}>
+                      Data Management
+                    </NavLink>
+                  </li>
+                )}
+              </ul>
+            )}
           </li>
-          {isTeam && (userRoles?.Admin === 'Editor' || userRoles?.Admin === 'Admin') && (
-            <>
-              <li>
-                <NavLink to="/users" className={getNavLinkClass}>
-                  <span className="flex items-center gap-3">
-                    <i className="fas fa-users w-5 h-5 flex-shrink-0"></i>
-                    <span>User Management</span>
-                  </span>
-                </NavLink>
-              </li>
-            </>
-          )}
-          {userRoles?.Admin === 'Editor' && (
-            <>
-              <li>
-                <NavLink to="/data" className={getNavLinkClass}>
-                  <span className="flex items-center gap-3">
-                    <i className="fas fa-gear w-5 h-5 flex-shrink-0"></i>
-                    <span>AIDA Management</span>
-                  </span>
-                </NavLink>
-              </li>
-            </>
-          )}
         </ul>
       </nav>
       <div className="mt-auto">{/* Footer or user info can go here */}</div>
