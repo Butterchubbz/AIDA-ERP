@@ -24,7 +24,7 @@ jobs:
           node ./scripts/seed-presets.mjs
 
       - name: Apply collection rules
-        if: ${{ secrets.PBC_ADMIN_TOKEN }}
+        if: secrets.PBC_ADMIN_TOKEN != ''
         env:
           PBC_ADMIN_TOKEN: ${{ secrets.PBC_ADMIN_TOKEN }}
           PBC_URL: ${{ secrets.PBC_URL }}

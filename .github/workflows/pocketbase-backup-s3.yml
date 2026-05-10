@@ -49,16 +49,16 @@ jobs:
           aws s3api list-objects-v2 --bucket "$PB_S3_BUCKET" --query 'Contents[].[Key,LastModified]' --output json > /tmp/s3_objects.json || true
 
           node -e "
-const fs = require('fs');
-const objs = JSON.parse(fs.readFileSync('/tmp/s3_objects.json','utf8')||'[]');
-const days = Number(process.env.RETENTION_DAYS || 30);
-const cutoff = Date.now() - days*24*60*60*1000;
-const toDelete = objs.filter(o=>{ try{ const lm = new Date(o[1]).getTime(); return lm < cutoff;}catch(e){return false}}).map(o=>({Key:o[0]}));
-if(toDelete.length===0){ console.log('No objects to delete'); process.exit(0); }
-const payload = {Objects: toDelete};
-fs.writeFileSync('/tmp/delete_payload.json', JSON.stringify(payload));
-console.log('Deleting', toDelete.length, 'objects');
-";
+          const fs = require('fs');
+          const objs = JSON.parse(fs.readFileSync('/tmp/s3_objects.json','utf8')||'[]');
+          const days = Number(process.env.RETENTION_DAYS || 30);
+          const cutoff = Date.now() - days*24*60*60*1000;
+          const toDelete = objs.filter(o=>{ try{ const lm = new Date(o[1]).getTime(); return lm < cutoff;}catch(e){return false}}).map(o=>({Key:o[0]}));
+          if(toDelete.length===0){ console.log('No objects to delete'); process.exit(0); }
+          const payload = {Objects: toDelete};
+          fs.writeFileSync('/tmp/delete_payload.json', JSON.stringify(payload));
+          console.log('Deleting', toDelete.length, 'objects');
+          "
 
           if [ -f /tmp/delete_payload.json ]; then
             aws s3api delete-objects --bucket "$PB_S3_BUCKET" --delete file:///tmp/delete_payload.json || true

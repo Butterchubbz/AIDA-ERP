@@ -58,7 +58,7 @@ jobs:
           asset_content_type: application/zip
 
       - name: Upload source maps to Sentry (optional)
-        if: startsWith(github.ref, 'refs/tags/v') && ${{ secrets.SENTRY_AUTH_TOKEN && secrets.SENTRY_ORG && secrets.SENTRY_PROJECT }}
+        if: startsWith(github.ref, 'refs/tags/v') && secrets.SENTRY_AUTH_TOKEN != '' && secrets.SENTRY_ORG != '' && secrets.SENTRY_PROJECT != ''
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
