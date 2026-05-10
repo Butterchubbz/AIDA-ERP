@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { ROLE_PERMISSIONS } from '@aida/shared'
 import type { User, AppRole } from '@aida/shared'
+import { ROLE_PERMISSIONS } from '../lib/sharedRuntime.js'
 
 interface AidaJwtPayload {
   sub: string
@@ -22,6 +22,12 @@ export function authMiddleware(
   _res: Response,
   next: NextFunction
 ): void {
+  // Skip JWT decoding for non-API paths (static assets, SPA navigations)
+  if (!req.path.startsWith('/api')) {
+    next()
+    return
+  }
+
   const token = req.cookies?.aida_session
 
   if (!token) {

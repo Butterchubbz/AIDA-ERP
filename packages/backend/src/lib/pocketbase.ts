@@ -8,11 +8,17 @@ import PocketBase from 'pocketbase'
 
 const pb = new PocketBase(process.env.PB_URL || 'http://127.0.0.1:8090')
 
+// Disable auto-cancellation — the SDK cancels concurrent requests to the same
+// collection by default (a UI debounce feature). On the backend, every request
+// is independent and must complete, so this must be off.
+pb.autoCancellation(false)
+
 /**
  * Authenticate as superuser using stored credentials.
- * Called once on backend startup.
+ * Retries up to maxAttempts times with linear backoff to handle PocketBase
+ * starting slightly after the backend process (common in the launcher).
  */
-export async function authenticatePocketBase(): Promise<void> {
+export async function authenticatePocketBase(maxAttempts = 10, retryDelayMs = 1000): Promise<void> {
   const email = process.env.PB_ADMIN_EMAIL
   const password = process.env.PB_ADMIN_PASSWORD
 
@@ -22,14 +28,27 @@ export async function authenticatePocketBase(): Promise<void> {
     )
   }
 
-  try {
-    // PocketBase v0.30 uses collection('_superusers') for admin auth
-    await pb.collection('_superusers').authWithPassword(email, password)
-    console.log(`[PocketBase] Authenticated as superuser: ${email}`)
-  } catch (err) {
-    console.error('[PocketBase] Authentication failed:', err)
-    throw err
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await pb.collection('_superusers').authWithPassword(email, password)
+      console.log(`[PocketBase] Authenticated as superuser: ${email}`)
+      return
+    } catch (err: unknown) {
+      lastErr = err
+      const isConnRefused =
+        err instanceof Error && err.message.includes('ECONNREFUSED')
+      if (isConnRefused && attempt < maxAttempts) {
+        console.log(`[PocketBase] Not ready yet, retrying (${attempt}/${maxAttempts})...`)
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs))
+      } else {
+        break
+      }
+    }
   }
+
+  console.error('[PocketBase] Authentication failed:', lastErr)
+  throw lastErr
 }
 
 /**

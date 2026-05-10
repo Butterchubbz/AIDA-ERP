@@ -1,40 +1,63 @@
 import type { Request, Response, NextFunction } from 'express'
 
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:5173'
+const DEFAULT_ALLOWED_ORIGINS = [
+  'http://localhost:3001',
+  'http://localhost:5173',
+  'http://localhost:8090',
+]
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGIN || DEFAULT_ALLOWED_ORIGINS.join(','))
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
 
-/**
- * CSRF protection: verify that the request origin matches ALLOWED_ORIGIN exactly.
- * Fail-closed: if origin header is missing, reject with 403.
- * Uses URL string equality to prevent subdomain confusion.
- */
 export function csrfOriginGuard(
   req: Request,
   res: Response,
   next: NextFunction
 ): void {
-  // Only check non-GET, non-HEAD, non-OPTIONS requests (i.e., state-changing operations)
+  if (!req.path.startsWith('/api')) {
+    next()
+    return
+  }
+
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     next()
     return
   }
 
   const origin = req.get('origin')
+
+  // No Origin header — same-origin navigation (e.g. direct form POST), safe to pass.
   if (!origin) {
-    res.status(403).json({ error: 'CSRF: missing origin header' })
+    next()
+    return
+  }
+
+  // Same-origin detection: request origin matches the server's own host.
+  try {
+    const originHost = new URL(origin).host
+    if (originHost === req.headers.host) {
+      next()
+      return
+    }
+  } catch {
+    res.status(403).json({ error: 'CSRF: invalid origin header' })
     return
   }
 
   try {
     const originUrl = new URL(origin)
-    const allowedUrl = new URL(ALLOWED_ORIGIN)
+    const allowed = ALLOWED_ORIGINS.some((allowedOrigin) => {
+      const allowedUrl = new URL(allowedOrigin)
+      return originUrl.origin === allowedUrl.origin
+    })
 
-    // Exact equality check
-    if (originUrl.origin !== allowedUrl.origin) {
+    if (!allowed) {
       res
         .status(403)
         .json({
           error: `CSRF: origin ${origin} not allowed`,
-          allowed: ALLOWED_ORIGIN,
+          allowed: ALLOWED_ORIGINS,
         })
       return
     }
