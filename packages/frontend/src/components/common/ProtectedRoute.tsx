@@ -9,17 +9,14 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, firstRunStatus = 'ready' }: ProtectedRouteProps) => {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, loadingAuth } = useAuth();
   const location = useLocation();
-
-  // You might want to add a loading state check here from useAuth if it provides one
-  // to show a spinner while the auth state is being determined.
 
   if (firstRunStatus === 'first-run' && !location.pathname.startsWith('/setup')) {
     return <Navigate to="/setup" replace />;
   }
 
-  if (firstRunStatus === 'checking') {
+  if (firstRunStatus === 'checking' || loadingAuth) {
     return null;
   }
 

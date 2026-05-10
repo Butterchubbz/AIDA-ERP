@@ -1,11 +1,10 @@
 import { useCallback } from 'react';
-import { COLLECTIONS } from '../lib/collections';
 import type { RMAEntry } from '@aida/shared';
 import { useCollectionCrud } from './useCollectionCrud';
 
 export const useRMATracker = () => {
   const { items, loading, error, createItem, updateItem, removeItem } = useCollectionCrud<RMAEntry>({
-    collection: COLLECTIONS.RMA_ENTRIES,
+    collection: 'rma/tickets',
     fetchErrorMessage: 'Failed to fetch RMA entries. Please try again.',
     addErrorMessage: 'Failed to add RMA entry.',
     updateErrorMessage: 'Failed to update RMA entry.',

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRoles } from '@aida/shared';
-import { apiClient } from '../lib/apiClient';
+import { ApiError, apiClient, isApiError } from '../lib/apiClient';
 
 interface AuthContextType {
   user: User | null;
@@ -29,18 +29,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     apiClient
       .get<{ user: User | null }>('/api/auth/session')
       .then(res => setUser(res.user))
-      .catch(() => setUser(null))
+      .catch((error: unknown) => {
+        if (isApiError(error) && error.status === 401) {
+          setUser(null);
+          return;
+        }
+
+        console.error('[Auth] Failed to restore session:', error);
+        setUser(null);
+      })
       .finally(() => setLoadingAuth(false));
   }, []);
 
   const login = async (email: string, pass: string) => {
-    const res = await apiClient.post<{ user: User }>('/api/auth/login', { email, password: pass });
-    setUser(res.user);
+    try {
+      const res = await apiClient.post<{ user: User }>('/api/auth/login', { email, password: pass });
+      setUser(res.user);
+    } catch (error: unknown) {
+      if (isApiError(error) && error.status === 401) {
+        throw error;
+      }
+
+      throw error;
+    }
   };
 
   const logout = async () => {
-    await apiClient.post('/api/auth/logout');
-    setUser(null);
+    try {
+      await apiClient.post('/api/auth/logout');
+    } catch (error: unknown) {
+      if (!(error instanceof ApiError) || error.status !== 401) {
+        throw error;
+      }
+    } finally {
+      setUser(null);
+    }
   };
 
   const value: AuthContextType = {
