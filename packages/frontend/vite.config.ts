@@ -24,8 +24,9 @@ const createConfig = async () => {
 
   return defineConfig({
   plugins: [react(), ...(visualizerPlugin ? [(visualizerPlugin as Plugin)] : [])],
+    base: '/',
     build: {
-      outDir: 'pb_public',
+      outDir: '../backend/public',
       emptyOutDir: true,
       rollupOptions: {
         output: {
@@ -45,6 +46,7 @@ const createConfig = async () => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/setupTests.ts',
+      exclude: ['test/smoke/**', '**/node_modules/**', '**/dist/**'],
     },
   });
 };

@@ -77,7 +77,7 @@ describe('Login', () => {
     expect(loginButton).toBeDisabled();
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', false);
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123');
       expect(mockNavigate).toHaveBeenCalledWith('/');
     });
 
@@ -102,7 +102,7 @@ describe('Login', () => {
     expect(loginButton).toBeDisabled();
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'wrongpassword', false);
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'wrongpassword');
       expect(
         screen.getByText(/failed to login. please check your credentials./i)
       ).toBeInTheDocument();

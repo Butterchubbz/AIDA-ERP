@@ -8,6 +8,7 @@ jobs:
   build-and-upload:
     name: Build and upload source maps to Sentry
     runs-on: ubuntu-latest
+    if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
