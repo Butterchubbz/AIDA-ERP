@@ -78,44 +78,11 @@ export async function saveVendorConfigs(req: Request, res: Response): Promise<vo
  *   - mode: 'manual' | 'automatic' | 'combined'
  *   - window: '30' | '60' | '90'
  */
-export async function getForecast(req: Request, res: Response): Promise<void> {
-  if (!req.user) {
-    res.status(401).json({ error: 'Unauthorized' })
-    return
-  }
-
-  try {
-    const mode = (req.query.mode as string) || 'combined'
-    const window = parseInt((req.query.window as string) || '30')
-
-    // Fetch user preferences for velocity overrides
-    const userId = req.user.id
-    const prefs = await pb
-      .collection('userPreferences')
-      .getFirstListItem(`userId = "${userId}"`)
-      .catch(() => null)
-
-    const velocityOverrides = prefs?.velocityOverrides || {}
-
-    // Fetch all necessary data
-    // TODO: Use these in actual forecast calculation
-    await pb.collection('inventoryDevice').getFullList()
-    await pb.collection('inventoryComponent').getFullList()
-    await pb.collection('amazonPOs').getFullList().catch(() => [])
-    prefs?.vendorConfigs || {}
-
-    // TODO: Implement actual forecast calculation based on mode, window, velocity overrides
-    // For now, return stub with the data fetched
-    const forecastItems: any[] = []
-
-    res.status(200).json({
-      items: forecastItems,
-      mode,
-      window,
-      velocityOverrides,
-    })
-  } catch (err: unknown) {
-    console.error('[Forecasting] GET forecast failed:', err)
-    res.status(500).json({ error: 'Failed to calculate forecast' })
-  }
+export async function getForecast(_req: Request, res: Response): Promise<void> {
+  res.status(501).json({
+    error: 'Not Implemented',
+    status: 501,
+    message: 'Forecasting engine is under development. Check back soon.',
+    contact: 'For details, see the roadmap or contact support.',
+  })
 }

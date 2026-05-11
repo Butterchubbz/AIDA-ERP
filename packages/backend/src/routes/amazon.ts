@@ -105,19 +105,11 @@ export async function listAmazonInventory(req: Request, res: Response): Promise<
  * Synchronize Amazon inventory with PocketBase.
  * TODO: Implement actual sync logic with Amazon SP-API.
  */
-export async function syncAmazonInventory(req: Request, res: Response): Promise<void> {
-  if (!req.user) {
-    res.status(401).json({ error: 'Unauthorized' })
-    return
-  }
-
-  try {
-    // TODO: Call Amazon SP-API to fetch current inventory
-    // TODO: Update amazonInventory collection
-    // For now, return stub
-    res.status(200).json({ message: 'Sync initiated' })
-  } catch (err: unknown) {
-    console.error('[Amazon] POST sync failed:', err)
-    res.status(400).json({ error: 'Failed to sync Amazon inventory' })
-  }
+export async function syncAmazonInventory(_req: Request, res: Response): Promise<void> {
+  res.status(501).json({
+    error: 'Not Implemented',
+    status: 501,
+    message: 'Amazon inventory sync is not yet fully implemented. Please use manual CSV upload for now.',
+    contact: 'For details, see the roadmap or contact support.',
+  })
 }

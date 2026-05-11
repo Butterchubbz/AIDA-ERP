@@ -232,3 +232,16 @@ export async function deleteOutboundShipment(req: Request, res: Response): Promi
     res.status(400).json({ error: 'Failed to delete outbound shipment' })
   }
 }
+
+/**
+ * POST /api/shipments/forecast
+ * Placeholder endpoint until shipment forecasting is implemented.
+ */
+export async function forecastShipments(_req: Request, res: Response): Promise<void> {
+  res.status(501).json({
+    error: 'Not Implemented',
+    status: 501,
+    message: 'Shipment forecasting is not yet available.',
+    contact: 'For details, see the roadmap or contact support.',
+  })
+}
