@@ -99,6 +99,7 @@ import {
   saveEncryptionKey,
   initCollections,
   setWorkspaceMode,
+  bootstrapMissingCollections,
 } from './routes/setup.js'
 
 const app = express()
@@ -361,6 +362,9 @@ async function startServer() {
     // Authenticate with PocketBase before starting server
     await authenticatePocketBase()
     console.log('[PocketBase] Authenticated successfully')
+
+    // Ensure all required collections exist (no-op if already present, self-heals missing ones)
+    await bootstrapMissingCollections()
 
     await startIntegrationScheduler()
     console.log('[Scheduler] Integration auto-sync scheduler initialized')

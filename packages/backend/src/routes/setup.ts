@@ -16,6 +16,7 @@ interface SetupState {
   inventoryAccessory: CollectionCheck
   stockHistory: CollectionCheck
   wcUnknownSkus: CollectionCheck
+  salesData: CollectionCheck
   setupComplete: boolean
 }
 
@@ -37,6 +38,7 @@ const REQUIRED_COLLECTIONS = [
   'inventoryAccessory',
   'stockHistory',
   'wcUnknownSkus',
+  'salesData',
 ] as const
 
 type RequiredCollection = typeof REQUIRED_COLLECTIONS[number]
@@ -249,6 +251,15 @@ const wcUnknownSkusFields: Array<Record<string, unknown>> = [
   { name: 'dismissed', type: 'bool' },
 ]
 
+const salesDataFields: Array<Record<string, unknown>> = [
+  { name: 'sku', type: 'text', required: true },
+  { name: 'saleDate', type: 'text', required: true },
+  { name: 'quantity', type: 'number' },
+  { name: 'salePrice', type: 'number' },
+  { name: 'source', type: 'text' },
+  { name: 'userId', type: 'text' },
+]
+
 const COLLECTION_FIELDS: Record<RequiredCollection, Array<Record<string, unknown>>> = {
   userPreferences: userPreferencesFields,
   integrations: integrationsFields,
@@ -257,6 +268,7 @@ const COLLECTION_FIELDS: Record<RequiredCollection, Array<Record<string, unknown
   inventoryAccessory: inventoryAccessoryFields,
   stockHistory: stockHistoryFields,
   wcUnknownSkus: wcUnknownSkusFields,
+  salesData: salesDataFields,
 }
 
 async function evaluateSetupState(): Promise<SetupState> {
@@ -275,7 +287,7 @@ async function evaluateSetupState(): Promise<SetupState> {
     }
     return {
       encryptionKey: encryptionKeyStatus,
-      ...(failed as Pick<SetupState, 'userPreferences' | 'integrations' | 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory' | 'stockHistory' | 'wcUnknownSkus'>),
+      ...(failed as Pick<SetupState, 'userPreferences' | 'integrations' | 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory' | 'stockHistory' | 'wcUnknownSkus' | 'salesData'>),
       setupComplete: false,
     }
   }
@@ -305,7 +317,29 @@ async function evaluateSetupState(): Promise<SetupState> {
     inventoryAccessory: collectionStatuses.inventoryAccessory ?? 'failed',
     stockHistory: collectionStatuses.stockHistory ?? 'failed',
     wcUnknownSkus: collectionStatuses.wcUnknownSkus ?? 'failed',
+    salesData: collectionStatuses.salesData ?? 'failed',
     setupComplete,
+  }
+}
+
+/**
+ * Ensures the salesData collection exists. Called at server startup so that
+ * existing installations that pre-date this collection get it automatically
+ * without needing to re-run the setup wizard.
+ */
+export async function bootstrapMissingCollections(): Promise<void> {
+  try {
+    await ensurePocketBaseAuth()
+    for (const name of REQUIRED_COLLECTIONS) {
+      try {
+        await ensureCollection(name, COLLECTION_FIELDS[name])
+      } catch (err: unknown) {
+        console.warn(`[Bootstrap] Could not ensure collection "${name}":`, err)
+      }
+    }
+    console.log('[Bootstrap] Required collections verified/created.')
+  } catch (err: unknown) {
+    console.warn('[Bootstrap] PocketBase not ready during collection bootstrap — skipping:', err)
   }
 }
 
@@ -338,6 +372,7 @@ export async function checkSetupHealth(_req: Request, res: Response): Promise<vo
       inventoryAccessory: setup.inventoryAccessory,
       stockHistory: setup.stockHistory,
       wcUnknownSkus: setup.wcUnknownSkus,
+      salesData: setup.salesData,
     },
   })
 }
