@@ -341,6 +341,6 @@ export const ShopifyAdapter: IntegrationAdapter = {
     }))
     errors.push(...salesResult.errors)
 
-    return { recordsImported, errors, unknownSkuCount: unknownSkus.length }
+    return { recordsImported, salesImported: salesResult.upserted, errors, unknownSkuCount: unknownSkus.length }
   },
 }

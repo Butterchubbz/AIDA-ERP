@@ -11,6 +11,7 @@ export interface CredentialField {
 
 export interface SyncResult {
   recordsImported: number
+  salesImported: number
   errors: string[]
   unknownSkuCount: number
 }

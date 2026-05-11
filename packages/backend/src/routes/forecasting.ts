@@ -10,6 +10,10 @@ import type {
   InboundShipment,
   ProjectionPoint,
 } from '@aida/shared'
+function normalizeSku(sku: string): string {
+  return sku.toLowerCase().replace(/\s*-\s*/g, '-').trim()
+}
+
 // ISO 8601 Monday of week N — mirrors the shared weekToDate util
 function weekToDate(year: number, week: number): Date {
   const january4th = new Date(Date.UTC(year, 0, 4))
@@ -150,10 +154,11 @@ export async function getForecast(req: Request, res: Response): Promise<void> {
     const salesBySku = new Map<string, Map<string, number>>()
     for (const record of salesRecords) {
       if (!record.sku?.trim() || !record.saleDate) continue
+      const nSku = normalizeSku(record.sku)
       const { year, week } = getIsoWeek(new Date(record.saleDate))
       const key = weekKey(year, week)
-      if (!salesBySku.has(record.sku)) salesBySku.set(record.sku, new Map())
-      const m = salesBySku.get(record.sku)!
+      if (!salesBySku.has(nSku)) salesBySku.set(nSku, new Map())
+      const m = salesBySku.get(nSku)!
       m.set(key, (m.get(key) ?? 0) + (record.quantity ?? 0))
     }
 
@@ -181,7 +186,8 @@ export async function getForecast(req: Request, res: Response): Promise<void> {
     for (const shipment of inboundShipments) {
       for (const lineItem of (shipment.items ?? [])) {
         if (lineItem.sku?.trim()) {
-          inboundBySku.set(lineItem.sku, (inboundBySku.get(lineItem.sku) ?? 0) + (lineItem.quantity ?? 0))
+          const nSku = normalizeSku(lineItem.sku)
+          inboundBySku.set(nSku, (inboundBySku.get(nSku) ?? 0) + (lineItem.quantity ?? 0))
         }
       }
     }
@@ -205,7 +211,8 @@ export async function getForecast(req: Request, res: Response): Promise<void> {
         ? deviceCurrentStock(item as DeviceItem)
         : componentCurrentStock(item as ComponentItem)
 
-      const inboundQty = inboundBySku.get(item.sku) ?? 0
+      const nItemSku = normalizeSku(item.sku)
+      const inboundQty = inboundBySku.get(nItemSku) ?? 0
       const effectiveStock = currentStock + inboundQty
 
       // Vendor info
@@ -220,7 +227,7 @@ export async function getForecast(req: Request, res: Response): Promise<void> {
         : 20
 
       // Sales velocity (units/week from salesData)
-      const skuSalesMap = salesBySku.get(item.sku)
+      const skuSalesMap = salesBySku.get(nItemSku)
       let salesTotal = 0
       let salesWeeksWithData = 0
       for (const pw of pastWeeks) {

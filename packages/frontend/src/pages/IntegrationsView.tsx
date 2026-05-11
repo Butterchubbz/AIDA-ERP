@@ -126,21 +126,22 @@ export default function IntegrationsView() {
       // Always sync count — resets to 0 if all SKUs were resolved this run.
       setUnknownSkuCount(result.unknownSkuCount)
 
+      const salesNote = result.salesImported > 0 ? ` · ${result.salesImported} sales records written.` : ''
       if (result.errors.length === 0 && result.unknownSkuCount === 0) {
         setTimedFeedback(type, {
           tone: 'success',
-          message: `Imported ${result.recordsImported} items.`,
+          message: `Imported ${result.recordsImported} inventory items${salesNote}`,
         })
       } else if (result.errors.length > 0) {
         setTimedFeedback(type, {
           tone: 'warning',
-          message: `Imported ${result.recordsImported} items. ${result.errors.length} warnings were reported.`,
+          message: `Imported ${result.recordsImported} inventory items${salesNote} · ${result.errors.length} warnings.`,
           details: result.errors,
         })
       } else {
         setTimedFeedback(type, {
           tone: 'success',
-          message: `Imported ${result.recordsImported} items.`,
+          message: `Imported ${result.recordsImported} inventory items${salesNote}`,
         })
       }
     } catch (err: unknown) {

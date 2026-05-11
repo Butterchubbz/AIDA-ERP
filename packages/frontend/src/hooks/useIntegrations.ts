@@ -28,6 +28,7 @@ export interface IntegrationStatus {
 
 interface SyncResponse {
   recordsImported: number
+  salesImported: number
   errors: string[]
   unknownSkuCount: number
 }
