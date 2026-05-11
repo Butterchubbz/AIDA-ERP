@@ -24,9 +24,11 @@ export interface IntegrationAdapter {
 }
 
 import { WooCommerceAdapter } from './woocommerce.js'
+import { ShopifyAdapter } from './shopify.js'
 
 const REGISTRY: Record<string, IntegrationAdapter> = {
   woocommerce: WooCommerceAdapter,
+  shopify: ShopifyAdapter,
 }
 
 export function getAdapter(type: string): IntegrationAdapter | undefined {
