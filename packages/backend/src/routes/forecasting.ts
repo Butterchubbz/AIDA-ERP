@@ -10,7 +10,16 @@ import type {
   InboundShipment,
   ProjectionPoint,
 } from '@aida/shared'
-import { weekToDate } from '@aida/shared'
+// ISO 8601 Monday of week N — mirrors the shared weekToDate util
+function weekToDate(year: number, week: number): Date {
+  const january4th = new Date(Date.UTC(year, 0, 4))
+  const day = january4th.getUTCDay() || 7
+  const mondayOfWeek1 = new Date(january4th)
+  mondayOfWeek1.setUTCDate(january4th.getUTCDate() + 1 - day)
+  const out = new Date(mondayOfWeek1)
+  out.setUTCDate(mondayOfWeek1.getUTCDate() + (week - 1) * 7)
+  return out
+}
 
 // ISO week (Monday-based) from a UTC Date
 function getIsoWeek(date: Date): { year: number; week: number } {
