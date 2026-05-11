@@ -16,7 +16,6 @@ interface SetupState {
   inventoryAccessory: CollectionCheck
   stockHistory: CollectionCheck
   wcUnknownSkus: CollectionCheck
-  salesData: CollectionCheck
   setupComplete: boolean
 }
 
@@ -30,6 +29,7 @@ interface SetWorkspaceModeRequest {
 
 const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
 
+// Collections gated by the setup wizard — must all exist for setupComplete to be true.
 const REQUIRED_COLLECTIONS = [
   'userPreferences',
   'integrations',
@@ -38,10 +38,24 @@ const REQUIRED_COLLECTIONS = [
   'inventoryAccessory',
   'stockHistory',
   'wcUnknownSkus',
-  'salesData',
 ] as const
 
 type RequiredCollection = typeof REQUIRED_COLLECTIONS[number]
+
+// Runtime collections created silently at startup — not part of setup wizard gating.
+const RUNTIME_COLLECTIONS: Array<{ name: string; fields: Array<Record<string, unknown>> }> = [
+  {
+    name: 'salesData',
+    fields: [
+      { name: 'sku', type: 'text', required: true },
+      { name: 'saleDate', type: 'text', required: true },
+      { name: 'quantity', type: 'number' },
+      { name: 'salePrice', type: 'number' },
+      { name: 'source', type: 'text' },
+      { name: 'userId', type: 'text' },
+    ],
+  },
+]
 
 function getRepoRoot(): string {
   const currentFile = fileURLToPath(import.meta.url)
@@ -251,15 +265,6 @@ const wcUnknownSkusFields: Array<Record<string, unknown>> = [
   { name: 'dismissed', type: 'bool' },
 ]
 
-const salesDataFields: Array<Record<string, unknown>> = [
-  { name: 'sku', type: 'text', required: true },
-  { name: 'saleDate', type: 'text', required: true },
-  { name: 'quantity', type: 'number' },
-  { name: 'salePrice', type: 'number' },
-  { name: 'source', type: 'text' },
-  { name: 'userId', type: 'text' },
-]
-
 const COLLECTION_FIELDS: Record<RequiredCollection, Array<Record<string, unknown>>> = {
   userPreferences: userPreferencesFields,
   integrations: integrationsFields,
@@ -268,7 +273,6 @@ const COLLECTION_FIELDS: Record<RequiredCollection, Array<Record<string, unknown
   inventoryAccessory: inventoryAccessoryFields,
   stockHistory: stockHistoryFields,
   wcUnknownSkus: wcUnknownSkusFields,
-  salesData: salesDataFields,
 }
 
 async function evaluateSetupState(): Promise<SetupState> {
@@ -287,7 +291,7 @@ async function evaluateSetupState(): Promise<SetupState> {
     }
     return {
       encryptionKey: encryptionKeyStatus,
-      ...(failed as Pick<SetupState, 'userPreferences' | 'integrations' | 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory' | 'stockHistory' | 'wcUnknownSkus' | 'salesData'>),
+      ...(failed as Pick<SetupState, 'userPreferences' | 'integrations' | 'inventoryDevice' | 'inventoryComponent' | 'inventoryAccessory' | 'stockHistory' | 'wcUnknownSkus'>),
       setupComplete: false,
     }
   }
@@ -317,7 +321,6 @@ async function evaluateSetupState(): Promise<SetupState> {
     inventoryAccessory: collectionStatuses.inventoryAccessory ?? 'failed',
     stockHistory: collectionStatuses.stockHistory ?? 'failed',
     wcUnknownSkus: collectionStatuses.wcUnknownSkus ?? 'failed',
-    salesData: collectionStatuses.salesData ?? 'failed',
     setupComplete,
   }
 }
@@ -330,6 +333,7 @@ async function evaluateSetupState(): Promise<SetupState> {
 export async function bootstrapMissingCollections(): Promise<void> {
   try {
     await ensurePocketBaseAuth()
+
     for (const name of REQUIRED_COLLECTIONS) {
       try {
         await ensureCollection(name, COLLECTION_FIELDS[name])
@@ -337,6 +341,15 @@ export async function bootstrapMissingCollections(): Promise<void> {
         console.warn(`[Bootstrap] Could not ensure collection "${name}":`, err)
       }
     }
+
+    for (const { name, fields } of RUNTIME_COLLECTIONS) {
+      try {
+        await ensureCollection(name, fields)
+      } catch (err: unknown) {
+        console.warn(`[Bootstrap] Could not ensure runtime collection "${name}":`, err)
+      }
+    }
+
     console.log('[Bootstrap] Required collections verified/created.')
   } catch (err: unknown) {
     console.warn('[Bootstrap] PocketBase not ready during collection bootstrap — skipping:', err)
@@ -372,7 +385,6 @@ export async function checkSetupHealth(_req: Request, res: Response): Promise<vo
       inventoryAccessory: setup.inventoryAccessory,
       stockHistory: setup.stockHistory,
       wcUnknownSkus: setup.wcUnknownSkus,
-      salesData: setup.salesData,
     },
   })
 }

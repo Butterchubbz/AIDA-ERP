@@ -47,7 +47,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const sessionOptions: SignOptions = {
-      expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
+      expiresIn: (process.env.JWT_EXPIRES_IN || '8h') as any,
     }
     const refreshOptions: SignOptions = {
       expiresIn: (process.env.REFRESH_EXPIRES_IN || '7d') as any,
@@ -76,7 +76,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     )
 
     // Set cookies
-    const sessionMaxAge = 15 * 60 * 1000 // 15 minutes
+    const sessionMaxAge = 8 * 60 * 60 * 1000 // 8 hours
     const refreshMaxAge = 7 * 24 * 60 * 60 * 1000 // 7 days
     const isProduction = process.env.NODE_ENV === 'production'
 
@@ -170,7 +170,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     }
 
     const refreshSessionOptions: SignOptions = {
-      expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
+      expiresIn: (process.env.JWT_EXPIRES_IN || '8h') as any,
     }
 
     const sessionToken = jwt.sign(
