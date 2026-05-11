@@ -1,5 +1,19 @@
 import type PocketBase from 'pocketbase'
 import type { IntegrationAdapter, SyncResult } from './registry.js'
+import { aggregateSalesEntries, upsertSalesEntries } from './salesSync.js'
+
+interface ShopifyOrderLineItem {
+  id: number
+  sku: string
+  quantity: number
+  price: string // unit price, e.g. "29.99"
+}
+
+interface ShopifyOrder {
+  id: number
+  created_at: string // e.g. "2026-02-15T10:30:00-05:00"
+  line_items: ShopifyOrderLineItem[]
+}
 
 interface ShopifyVariant {
   id: number
@@ -279,6 +293,53 @@ export const ShopifyAdapter: IntegrationAdapter = {
         // Non-fatal — snapshot failure does not abort the sync result.
       }
     }
+
+    // --- Sales history sync (last 90 days of paid orders) ---
+    const salesCutoff = new Date()
+    salesCutoff.setMonth(salesCutoff.getMonth() - 3)
+    const salesCutoffIso = salesCutoff.toISOString()
+
+    const rawSalesLines: Array<{ sku: string; saleDate: string; quantity: number; lineTotal: number }> = []
+    let ordersNextUrl: string | null =
+      `${trimmedUrl}/admin/api/2025-01/orders.json?limit=250&financial_status=paid&created_at_min=${encodeURIComponent(salesCutoffIso)}&fields=id,created_at,line_items`
+
+    while (ordersNextUrl) {
+      const res = await shopifyFetch(ordersNextUrl, accessToken).catch((err: unknown) => {
+        errors.push(`Sales history fetch failed: ${err instanceof Error ? err.message : 'unknown error'}`)
+        return null
+      })
+
+      if (!res) break
+      if (!res.ok) {
+        errors.push(`Shopify orders API returned ${res.status} — skipping sales history`)
+        break
+      }
+
+      const data: { orders: ShopifyOrder[] } = await res.json()
+      ordersNextUrl = parseNextLink(res.headers.get('Link'))
+
+      for (const order of data.orders ?? []) {
+        const saleDate = order.created_at?.split('T')[0]
+        if (!saleDate) continue
+        for (const item of order.line_items ?? []) {
+          if (!item.sku?.trim()) continue
+          const unitPrice = parseFloat(item.price ?? '0') || 0
+          rawSalesLines.push({
+            sku: item.sku,
+            saleDate,
+            quantity: item.quantity ?? 0,
+            lineTotal: unitPrice * (item.quantity ?? 0),
+          })
+        }
+      }
+    }
+
+    const salesEntries = aggregateSalesEntries(rawSalesLines, 'shopify')
+    const salesResult = await upsertSalesEntries(pb, salesEntries).catch((err: unknown) => ({
+      upserted: 0,
+      errors: [`Sales data upsert failed: ${err instanceof Error ? err.message : 'unknown error'}`],
+    }))
+    errors.push(...salesResult.errors)
 
     return { recordsImported, errors, unknownSkuCount: unknownSkus.length }
   },

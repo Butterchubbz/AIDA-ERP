@@ -1,5 +1,20 @@
 import type PocketBase from 'pocketbase'
 import type { IntegrationAdapter, SyncResult } from './registry.js'
+import { aggregateSalesEntries, upsertSalesEntries } from './salesSync.js'
+
+interface WCOrderLineItem {
+  id: number
+  sku: string
+  quantity: number
+  total: string // e.g. "59.98"
+}
+
+interface WCOrder {
+  id: number
+  date_created: string // e.g. "2026-02-15T10:30:00"
+  status: string
+  line_items: WCOrderLineItem[]
+}
 
 interface WCProduct {
   id: number
@@ -348,6 +363,56 @@ export const WooCommerceAdapter: IntegrationAdapter = {
         // Non-fatal — snapshot failure does not abort the sync result.
       }
     }
+
+    // --- Sales history sync (last 90 days of completed orders) ---
+    const salesCutoff = new Date()
+    salesCutoff.setMonth(salesCutoff.getMonth() - 3)
+    const salesCutoffIso = salesCutoff.toISOString().replace(/\.\d{3}Z$/, '')
+
+    const rawSalesLines: Array<{ sku: string; saleDate: string; quantity: number; lineTotal: number }> = []
+    let ordersPage = 1
+
+    while (true) {
+      const url =
+        `${baseUrl}/wp-json/wc/v3/orders?per_page=100&page=${ordersPage}&status=completed&after=${encodeURIComponent(salesCutoffIso)}`
+      const res = await wcFetch(url, authHeader).catch((err: unknown) => {
+        errors.push(`Sales history fetch failed (page ${ordersPage}): ${err instanceof Error ? err.message : 'unknown error'}`)
+        return null
+      })
+
+      if (!res) break
+      if (!res.ok) {
+        errors.push(`WooCommerce orders API returned ${res.status} on page ${ordersPage} — skipping sales history`)
+        break
+      }
+
+      const orders: WCOrder[] = await res.json()
+      if (orders.length === 0) break
+
+      for (const order of orders) {
+        const saleDate = order.date_created?.split('T')[0]
+        if (!saleDate) continue
+        for (const item of order.line_items ?? []) {
+          if (!item.sku?.trim()) continue
+          rawSalesLines.push({
+            sku: item.sku,
+            saleDate,
+            quantity: item.quantity ?? 0,
+            lineTotal: parseFloat(item.total ?? '0') || 0,
+          })
+        }
+      }
+
+      if (orders.length < 100) break
+      ordersPage++
+    }
+
+    const salesEntries = aggregateSalesEntries(rawSalesLines, 'woocommerce')
+    const salesResult = await upsertSalesEntries(pb, salesEntries).catch((err: unknown) => ({
+      upserted: 0,
+      errors: [`Sales data upsert failed: ${err instanceof Error ? err.message : 'unknown error'}`],
+    }))
+    errors.push(...salesResult.errors)
 
     return { recordsImported, errors, unknownSkuCount: unknownSkus.length }
   },
