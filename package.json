@@ -1,0 +1,17 @@
+{
+  "name": "aida-erp-monorepo",
+  "private": true,
+  "author": "Patrick Walton",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace=@aida/shared && npm run dev --workspace=@aida/frontend",
+    "build": "node -e \"const fs=require('fs'); const path=require('path'); const dir=path.resolve('packages/backend/public'); fs.rmSync(dir,{recursive:true,force:true}); fs.mkdirSync(dir,{recursive:true});\" && npm run build --workspace=@aida/shared && npm run build --workspace=@aida/frontend && npm run typecheck --workspace=@aida/backend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:shared-build": "npm run check:build --workspace=@aida/shared",
+    "start:backend": "npm run build --workspace=@aida/shared && npm run dev --workspace=@aida/backend",
+    "lint": "npm run lint --workspace=@aida/frontend"
+  }
+}

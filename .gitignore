@@ -1,0 +1,127 @@
+# -----------------------------------------------------------------------------
+# Dependency Directories
+# -----------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+
+# -----------------------------------------------------------------------------
+# Environment & Secrets
+# -----------------------------------------------------------------------------
+# Root-level and nested environment files must never be committed.
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Common local overrides across the monorepo.
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Local secrets or developer credentials.
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# -----------------------------------------------------------------------------
+# Local Databases, PocketBase, and SQLite
+# -----------------------------------------------------------------------------
+pb_data/
+**/pb_data/
+
+# Local SQLite database files and journaling state.
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# PocketBase local binary artifacts downloaded directly into the repo.
+pocketbase
+pocketbase.exe
+pocketbase-*
+
+# -----------------------------------------------------------------------------
+# Build Output & Bundling Artifacts
+# -----------------------------------------------------------------------------
+dist/
+**/dist/
+packages/frontend/dist/
+packages/backend/public/assets/
+
+# Vite and build tooling caches.
+.vite/
+.eslintcache
+.turbo/
+*.tsbuildinfo
+
+# -----------------------------------------------------------------------------
+# Logs and Diagnostics
+# -----------------------------------------------------------------------------
+logs/
+**/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# -----------------------------------------------------------------------------
+# Operating System Metadata
+# -----------------------------------------------------------------------------
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# -----------------------------------------------------------------------------
+# Editor / IDE Local State
+# -----------------------------------------------------------------------------
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Exclude local VS Code workspace state that should not be shared.
+.vscode/sftp.json
+.vscode/*.local
+
+# Generic IDE / editor files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+
+# -----------------------------------------------------------------------------
+# Local Project/Operational Data
+# -----------------------------------------------------------------------------
+# Common local runtime or import files that should not be committed.
+*.local
+bundle-report.json
+temp_import.json
+*_import.json
+*_export.json
+amazon_inventory_data.json
+sales_data_temp.csv
+test-results/
+
+# -----------------------------------------------------------------------------
+# Notes
+# -----------------------------------------------------------------------------
+# Keep .env.example template files tracked so developers know which variables are required.
+# This repository intentionally does not commit local PocketBase data or SQLite state.

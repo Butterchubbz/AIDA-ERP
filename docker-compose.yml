@@ -1,0 +1,66 @@
+# ==============================================================================
+# AIDA-ERP — PRODUCTION DOCKER COMPOSE CONFIGURATION
+# ==============================================================================
+version: '3.8'
+
+services:
+  # --- POCKETBASE DATABASE ENGINE ---
+  pocketbase:
+    container_name: aida-database
+    build:
+      context: .
+      dockerfile: Dockerfile.pb
+    volumes:
+      - pb_data:/pb_data
+    # Expose port 8090 so administrators can access the PocketBase backend admin UI.
+    # For a purely secure deployment, you can bind this locally (127.0.0.1:8090:8090)
+    # or remove the ports section entirely so only the Express container has access.
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --- AIDA MONOREPO APPLICATION SERVER ---
+  aida-app:
+    container_name: aida-application
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      # Connect directly to the internal PocketBase container address
+      - POCKETBASE_URL=http://pocketbase:8090
+      # Ensure CORS origins match the user's browser entry point
+      - ALLOWED_ORIGIN=http://localhost:3001
+      - CORS_ORIGIN=http://localhost:3001
+      
+      # ------------------------------------------------------------------------
+      # SECURITY CREDENTIALS
+      # ------------------------------------------------------------------------
+      # Tip: Instead of hardcoding these in the docker-compose.yml file,
+      # place them inside a ".env" file in the same directory as this file.
+      # Docker Compose will automatically read and inject them here!
+      #
+      # - JWT_SECRET=your_32_character_base64_secret_key_here
+      # - AIDA_ENCRYPTION_KEY=your_64_character_hex_encryption_key_here
+      # - PB_ADMIN_EMAIL=admin@your-company.com
+      # - PB_ADMIN_PASSWORD=your_strong_admin_password_here
+    env_file:
+      - .env
+    restart: unless-stopped
+
+# --- PERSISTENT DATA VOLUMES ---
+# Ensures your database files survive container updates, builds, and system reboots.
+volumes:
+  pb_data:
+    driver: local

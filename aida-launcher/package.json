@@ -1,0 +1,71 @@
+{
+  "name": "aida-launcher",
+  "version": "1.0.0",
+  "description": "AIDA Desktop Application Launcher",
+  "author": {
+    "name": "Patrick Walton"
+  },
+  "license": "MIT",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "npm run build && electron .",
+    "build": "npm run clean && npx tsc --diagnostics",
+    "clean": "rimraf dist",
+    "watch": "tsc -w",
+    "dev": "concurrently \"npm run watch\" \"electron .\"",
+    "pack": "electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.11.0",
+    "fs-extra": "^11.3.0",
+    "pocketbase": "^0.26.2",
+    "strip-ansi": "^6.0.1",
+    "tree-kill": "^1.2.2"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.4.0",
+    "concurrently": "^8.2.0",
+    "electron": "^37.2.6",
+    "electron-builder": "^24.13.3",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.1.0"
+  },
+  "build": {
+    "appId": "com.aida.launcher",
+    "productName": "AIDA",
+    "directories": {
+      "output": "build"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
+      "uninstallDisplayName": "AIDA",
+      "include": "build/uninstall.nsh",
+      "runAfterFinish": true
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false,
+      "requestedExecutionLevel": "asInvoker",
+      "legalTrademarks": "Patrick Walton",
+      "publisherName": "Patrick Walton"
+    },
+    "files": [
+      "dist/**/*",
+      "static/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../aida",
+        "to": "aida"
+      }
+    ],
+    "executableName": "AIDA_debug"
+  }
+}

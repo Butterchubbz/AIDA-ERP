@@ -1,0 +1,25 @@
+{
+  "name": "@aida/shared",
+  "version": "1.0.0",
+  "author": "Patrick Walton",
+  "license": "MIT",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "tsup src/index.ts --format esm,cjs --dts --out-dir dist",
+    "check:build": "npm run clean && npm run build && node --input-type=module --eval \"import('./dist/index.mjs').then(({ ROLE_PERMISSIONS }) => { if (!ROLE_PERMISSIONS) throw new Error('ROLE_PERMISSIONS is missing from the shared build') })\""
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "tsup": "^8"
+  }
+}

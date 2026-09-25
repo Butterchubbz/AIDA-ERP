@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="rmaTitle rmaDesc">
+  <title id="rmaTitle">Generic returns icon</title>
+  <desc id="rmaDesc">A repair wrench and circular arrows for refurbished and returns modules.</desc>
+  <circle cx="32" cy="32" r="24" fill="#1e293b" stroke="#f97316" stroke-width="3"/>
+  <path d="M24 36l16-16 3 3-16 16h-3z" fill="#fdba74"/>
+  <path d="M18 22a14 14 0 0 1 18-6" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M36 14l2 5-5-1" fill="none" stroke="#fb923c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 42a14 14 0 0 1-18 6" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M28 50l-2-5 5 1" fill="none" stroke="#fb923c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
