@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
-import { authenticatePocketBase } from './lib/pocketbase.js'
+import { authenticatePocketBase, isPbAuthenticated } from './lib/pocketbase.js'
 import { authMiddleware, requireAuth } from './middleware/auth.js'
 import { auditMutations } from './middleware/audit.js'
 import { requireAuditReadAccess } from './middleware/auditAccess.js'
@@ -120,7 +120,46 @@ import {
   bootstrapMissingCollections,
   getOwnerLockStatus,
   completeSetupWizard,
+  getSuperuserBootstrapStatus,
+  createSuperuserViaWizard,
 } from './routes/setup.js'
+
+/**
+ * Docker's container filesystem is ephemeral outside of declared volumes, so
+ * writes to the backend's local .env file (encryption key, wizard-provisioned
+ * PB admin credentials) would otherwise vanish on the next container restart.
+ * When AIDA_LOCAL_ENV_PATH is set (see docker-compose.yml, mounted on a
+ * persistent volume), reload it into process.env at boot, before anything
+ * else reads process.env — but never override a value the environment
+ * already provided (e.g. PB_ADMIN_EMAIL/PASSWORD set via compose/.env).
+ */
+function loadPersistedLocalEnv(): void {
+  const filePath = process.env.AIDA_LOCAL_ENV_PATH
+  if (!filePath) return
+
+  let content: string
+  try {
+    content = fs.readFileSync(filePath, 'utf8')
+  } catch {
+    return // nothing persisted yet — expected on a fresh volume
+  }
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+
+    const separatorIndex = trimmed.indexOf('=')
+    if (separatorIndex === -1) continue
+
+    const key = trimmed.slice(0, separatorIndex).trim()
+    const value = trimmed.slice(separatorIndex + 1).trim()
+    if (key && process.env[key] === undefined) {
+      process.env[key] = value
+    }
+  }
+}
+
+loadPersistedLocalEnv()
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -188,6 +227,8 @@ app.get('/api/health', (_req, res) => {
  * Setup routes (no auth required)
  */
 app.get('/api/setup/check-health', checkSetupHealth)
+app.get('/api/setup/superuser-bootstrap-status', getSuperuserBootstrapStatus)
+app.post('/api/setup/superuser-bootstrap', requireSetupAccess, createSuperuserViaWizard)
 app.post('/api/setup/save-encryption-key', requireSetupAccess, saveEncryptionKey)
 app.post('/api/setup/init-collections', requireSetupAccess, initCollections)
 app.post('/api/setup/set-workspace-mode', requireSetupAccess, setWorkspaceMode)
@@ -366,8 +407,6 @@ function validateStartupSecrets(): void {
   // from ever reaching the setup wizard.
   const required: Record<string, { min: number; desc: string }> = {
     JWT_SECRET: { min: 32, desc: 'JWT signing key' },
-    PB_ADMIN_EMAIL: { min: 5, desc: 'PocketBase superuser email' },
-    PB_ADMIN_PASSWORD: { min: 8, desc: 'PocketBase superuser password' },
   }
 
   const errors: string[] = []
@@ -380,6 +419,20 @@ function validateStartupSecrets(): void {
     }
     if (value.length < spec.min) {
       errors.push(`${key} is too short (min ${spec.min} chars, got ${value.length})`)
+    }
+  }
+
+  // PB_ADMIN_EMAIL/PB_ADMIN_PASSWORD are OPTIONAL — see pocketbase-entrypoint.sh
+  // and routes/setup.ts. When both are absent, the container boots without a
+  // PocketBase superuser and the setup wizard provisions one instead. If only
+  // one is set, that is a misconfiguration and should fail loud.
+  const pbEmail = process.env.PB_ADMIN_EMAIL?.trim()
+  const pbPassword = process.env.PB_ADMIN_PASSWORD?.trim()
+  if (pbEmail || pbPassword) {
+    if (!pbEmail) errors.push('PB_ADMIN_PASSWORD is set but PB_ADMIN_EMAIL is missing')
+    if (!pbPassword) errors.push('PB_ADMIN_EMAIL is set but PB_ADMIN_PASSWORD is missing')
+    if (pbPassword && pbPassword.length < 8) {
+      errors.push('PB_ADMIN_PASSWORD is too short (min 8 chars, got ' + pbPassword.length + ')')
     }
   }
 
@@ -403,13 +456,21 @@ async function startServer() {
 
     // Authenticate with PocketBase before starting server
     await authenticatePocketBase()
-    console.log('[PocketBase] Authenticated successfully')
 
-    // Ensure all required collections exist (no-op if already present, self-heals missing ones)
-    await bootstrapMissingCollections()
+    if (isPbAuthenticated()) {
+      console.log('[PocketBase] Authenticated successfully')
 
-    await startIntegrationScheduler()
-    console.log('[Scheduler] Integration auto-sync scheduler initialized')
+      // Ensure all required collections exist (no-op if already present, self-heals missing ones)
+      await bootstrapMissingCollections()
+
+      await startIntegrationScheduler()
+      console.log('[Scheduler] Integration auto-sync scheduler initialized')
+    } else {
+      console.log(
+        '[Startup] Running in Setup Mode — skipping collection bootstrap and the sync scheduler ' +
+        'until the setup wizard provisions a PocketBase superuser.'
+      )
+    }
 
     const server = app.listen(PORT, () => {
       console.log(`[Express] Server running on http://localhost:${PORT}`)

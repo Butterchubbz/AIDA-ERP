@@ -332,7 +332,7 @@ function buildErrorLog(
 export default function SetupPage() {
   const [searchParams] = useSearchParams();
   const steps = useMemo(
-    () => ['Welcome', 'Health Check', 'Generate Key', 'Collections', 'Workspace', 'Finish'],
+    () => ['Welcome', 'Health Check', 'Superuser', 'Generate Key', 'Collections', 'Workspace', 'Finish'],
     []
   );
   const rerunMode = searchParams.get('rerun') === '1';
@@ -348,6 +348,11 @@ export default function SetupPage() {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [keyState, setKeyState] = useState<'unknown' | 'saved' | 'error'>('unknown');
   const [keyMessage, setKeyMessage] = useState<string>('');
+  const [superuserState, setSuperuserState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [superuserMessage, setSuperuserMessage] = useState<string>('');
+  const [superuserEmail, setSuperuserEmail] = useState<string>('');
+  const [superuserPassword, setSuperuserPassword] = useState<string>('');
+  const [superuserConfirmPassword, setSuperuserConfirmPassword] = useState<string>('');
   const [collectionResult, setCollectionResult] = useState<InitCollectionsResponse | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<'solo' | 'team' | null>(null);
@@ -397,7 +402,7 @@ export default function SetupPage() {
       }
 
       if (response.setupComplete && !rerunMode) {
-        setStepIndex(5);
+        setStepIndex(6);
       }
     } catch (err: unknown) {
       const fallbackDebug =
@@ -478,10 +483,40 @@ export default function SetupPage() {
       sessionStorage.setItem('aida_setup_key_status', 'saved');
       setKeyState('saved');
       setKeyMessage('Your security key is generated and saved on this machine.');
-      setStepIndex(3);
+      setStepIndex(4);
     } catch (err: unknown) {
       setKeyState('error');
       setKeyMessage((err as { message?: string }).message ?? 'We could not save the key yet.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createSuperuser = async () => {
+    if (superuserPassword !== superuserConfirmPassword) {
+      setSuperuserState('error');
+      setSuperuserMessage('Passwords do not match.');
+      return;
+    }
+
+    setBusy(true);
+    setSuperuserState('saving');
+    setSuperuserMessage('');
+
+    try {
+      await apiClient.post('/api/setup/superuser-bootstrap', {
+        email: superuserEmail.trim(),
+        password: superuserPassword,
+      });
+
+      setSuperuserState('saved');
+      setSuperuserMessage('PocketBase superuser created.');
+      setSuperuserPassword('');
+      setSuperuserConfirmPassword('');
+      setStepIndex(3);
+    } catch (err: unknown) {
+      setSuperuserState('error');
+      setSuperuserMessage((err as { message?: string }).message ?? 'Could not create the superuser.');
     } finally {
       setBusy(false);
     }
@@ -496,7 +531,7 @@ export default function SetupPage() {
       setCollectionResult(result);
 
       if (result.complete) {
-        setStepIndex(4);
+        setStepIndex(5);
       }
     } catch (err: unknown) {
       setCollectionError((err as { message?: string }).message ?? 'Collection setup failed');
@@ -512,7 +547,7 @@ export default function SetupPage() {
     try {
       await apiClient.post('/api/setup/set-workspace-mode', { mode: workspaceMode });
       setWorkspaceSaveState('saved');
-      setStepIndex(5);
+      setStepIndex(6);
     } catch {
       setWorkspaceSaveState('error');
     } finally {
@@ -524,8 +559,19 @@ export default function SetupPage() {
   const collectionsReady = collectionResult?.complete === true;
   const showHealthActions = hasHealthAttempted && (!healthReady || Boolean(healthError));
 
-  const continueFromHealth = () => {
-    setStepIndex(2);
+  const continueFromHealth = async () => {
+    setBusy(true);
+    try {
+      const status = await apiClient.get<{ available: boolean }>('/api/setup/superuser-bootstrap-status');
+      setStepIndex(status.available ? 2 : 3);
+    } catch {
+      // If the status check itself fails, fall through to the encryption key
+      // step — the superuser step is only ever a wizard convenience, never
+      // the sole path to a working install.
+      setStepIndex(3);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const completeSetup = () => {
@@ -638,7 +684,7 @@ export default function SetupPage() {
                 </button>
               ) : null}
               <button
-                onClick={continueFromHealth}
+                onClick={() => void continueFromHealth()}
                 disabled={!healthReady || busy}
                 className="rounded-md bg-cyan-500 px-4 py-2 font-semibold text-slate-900 hover:bg-cyan-400 disabled:opacity-50"
               >
@@ -656,7 +702,67 @@ export default function SetupPage() {
 
         {stepIndex === 2 ? (
           <section className="space-y-4 rounded-lg border border-slate-700 bg-slate-800/80 p-6">
-            <h2 className="text-xl font-semibold text-slate-100">Step 3: Generate Security Key</h2>
+            <h2 className="text-xl font-semibold text-slate-100">Step 3: Create Database Superuser</h2>
+            <p className="text-slate-300">
+              Choose an email and password for the PocketBase superuser account that manages your data.
+              This account is only created once — it will not be offered again after this step.
+            </p>
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-300">
+                Email
+                <input
+                  type="email"
+                  value={superuserEmail}
+                  onChange={(e) => setSuperuserEmail(e.target.value)}
+                  autoComplete="username"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Password
+                <input
+                  type="password"
+                  value={superuserPassword}
+                  onChange={(e) => setSuperuserPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Confirm Password
+                <input
+                  type="password"
+                  value={superuserConfirmPassword}
+                  onChange={(e) => setSuperuserConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-slate-400">Password must be at least 10 characters.</p>
+            {superuserMessage ? (
+              <p className={`text-sm ${superuserState === 'error' ? 'text-rose-300' : 'text-emerald-300'}`} role="status">
+                {superuserMessage}
+              </p>
+            ) : null}
+            <button
+              onClick={() => void createSuperuser()}
+              disabled={
+                busy ||
+                !superuserEmail.trim() ||
+                superuserPassword.length < 10 ||
+                superuserPassword !== superuserConfirmPassword
+              }
+              className="rounded-md bg-cyan-500 px-4 py-2 font-semibold text-slate-900 hover:bg-cyan-400 disabled:opacity-50"
+            >
+              {busy ? 'Creating...' : 'Create Superuser'}
+            </button>
+          </section>
+        ) : null}
+
+        {stepIndex === 3 ? (
+          <section className="space-y-4 rounded-lg border border-slate-700 bg-slate-800/80 p-6">
+            <h2 className="text-xl font-semibold text-slate-100">Step 4: Generate Security Key</h2>
             <p className="text-slate-300">
               This creates your encryption key and saves it to your local environment files automatically.
             </p>
@@ -676,9 +782,9 @@ export default function SetupPage() {
           </section>
         ) : null}
 
-        {stepIndex === 3 ? (
+        {stepIndex === 4 ? (
           <section className="space-y-4 rounded-lg border border-slate-700 bg-slate-800/80 p-6">
-            <h2 className="text-xl font-semibold text-slate-100">Step 4: Collection Scaffolding</h2>
+            <h2 className="text-xl font-semibold text-slate-100">Step 5: Collection Scaffolding</h2>
             <p className="text-slate-300">
               We will create all required collections in PocketBase.
             </p>
@@ -731,9 +837,9 @@ export default function SetupPage() {
           </section>
         ) : null}
 
-        {stepIndex === 4 ? (
+        {stepIndex === 5 ? (
           <section className="space-y-6 rounded-lg border border-slate-700 bg-slate-800/80 p-6">
-            <h2 className="text-xl font-semibold text-slate-100">Step 5: Workspace Mode</h2>
+            <h2 className="text-xl font-semibold text-slate-100">Step 6: Workspace Mode</h2>
             <p className="text-slate-300">How will AIDA be used?</p>
             <div className="space-y-3">
               <label className={`flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-colors ${workspaceMode === 'solo' ? 'border-cyan-500 bg-slate-700' : 'border-slate-600 hover:border-slate-500'}`}>
@@ -778,7 +884,7 @@ export default function SetupPage() {
           </section>
         ) : null}
 
-        {stepIndex === 5 ? (
+        {stepIndex === 6 ? (
           <section className="rounded-lg border border-emerald-500/40 bg-emerald-900/20 p-6">
             <h2 className="text-xl font-semibold text-emerald-200">Setup Complete</h2>
             <p className="mt-3 text-emerald-100">

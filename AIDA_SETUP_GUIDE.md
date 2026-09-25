@@ -46,6 +46,19 @@ Step 4 — Start the AIDA frontend
 ````
 
 ---
+
+## Docker: the simplest first run
+
+If you are running AIDA via Docker (see `README-DOCKER.md` for the full guide), the documented first run is:
+
+1. Clone the repository.
+2. Run `docker compose up -d --build`.
+3. Open `http://localhost:3001` in your browser.
+4. The setup wizard asks for everything it needs — including, on a fresh install, creating the PocketBase superuser account directly in the browser if you did not already set `PB_ADMIN_EMAIL`/`PB_ADMIN_PASSWORD` in your `.env` file.
+
+You never need to touch the PocketBase container directly. The superuser-creation step in the wizard is only available while the PocketBase data volume is truly fresh (no superusers and no application users yet) — it disappears permanently once a superuser exists, whether that superuser was created via the wizard or via `.env` credentials.
+
+---
 ## Ownership and Rights
 Made by Patrick Walton with AI.
 Copyright (c) 2026 Patrick Walton. All rights reserved.

@@ -46,11 +46,15 @@ JWT_SECRET=super_secret_base64_signing_key_at_least_32_characters
 AIDA_ENCRYPTION_KEY=a1b2c3d4e5f607182930415263748596a1b2c3d4e5f607182930415263748596
 
 # ==============================================================================
-# POCKETBASE ADMINISTRATIVE ACCOUNT (SUPERUSER)
+# POCKETBASE ADMINISTRATIVE ACCOUNT (SUPERUSER) — OPTIONAL
 # ==============================================================================
-# Used by the backend system to establish the initial secure database link.
-PB_ADMIN_EMAIL=admin@yourcompany.com
-PB_ADMIN_PASSWORD=Select_A_Very_Strong_Database_Password_123!
+# Leave PB_ADMIN_EMAIL/PB_ADMIN_PASSWORD unset (or delete these two lines) for
+# the simplest first run: the in-browser setup wizard will let you create the
+# PocketBase superuser yourself instead. Only set them here if you want the
+# superuser provisioned automatically/non-interactively on first boot.
+#
+# PB_ADMIN_EMAIL=admin@yourcompany.com
+# PB_ADMIN_PASSWORD=Select_A_Very_Strong_Database_Password_123!
 ```
 
 ---
@@ -82,16 +86,17 @@ docker compose logs -f
 ---
 
 ## 🧙‍♂️ Step 3: Run the Guided Setup Wizard
-Once the containers report `healthy`, AIDA is fully operational.
+Once the containers report `healthy`, AIDA is fully operational. The documented first run is simply: **clone → `docker compose up` → open your browser → the wizard asks for everything.**
 
 1. Open your default browser and navigate to: **`http://localhost:3001`**
 2. Since this is a fresh install, AIDA will automatically detect an unconfigured system state and launch the **Setup Wizard v2**.
 3. **Step 1 (Welcome)**: Click **Start Setup**.
 4. **Step 2 (System Health Check)**: The wizard will probe both the Express backend and PocketBase databases, turning both status lights green. Click **Continue**.
-5. **Step 3 (Encryption Key)**: Because you already defined `AIDA_ENCRYPTION_KEY` in your `.env` file during Step 1, the wizard will detect it and report: *"A security key is already configured."* Click **Continue**.
-6. **Step 4 (Database Scaffolding)**: The backend will automatically scaffold all **11 required database collections** (including dynamic workspaces, RMA returns, and logistics history logs). Watch the checklist indicators turn green, then click **Continue**.
-7. **Step 5 (Workspace Mode)**: Choose **Solo Mode** or **Team Mode** (multi-user role-based access controls) based on your company's operational hierarchy.
-8. **Step 6 (Finish)**: Click **Go to AIDA** to be redirected to the secure login screen. Use the email and password you defined in your `.env` file to log in!
+5. **Step 3 (Create Database Superuser)**: If you did **not** set `PB_ADMIN_EMAIL`/`PB_ADMIN_PASSWORD` in your `.env` file, the wizard shows this step and lets you choose the email/password for the PocketBase superuser directly in the browser. This step is only ever offered once — as soon as a superuser exists it disappears permanently for the lifetime of your data volume. If you *did* set those variables in `.env`, this step is skipped automatically since the container already provisioned the superuser on boot.
+6. **Step 4 (Encryption Key)**: Because you already defined `AIDA_ENCRYPTION_KEY` in your `.env` file during Step 1, the wizard will detect it and report: *"A security key is already configured."* Click **Continue**.
+7. **Step 5 (Database Scaffolding)**: The backend will automatically scaffold all **11 required database collections** (including dynamic workspaces, RMA returns, and logistics history logs). Watch the checklist indicators turn green, then click **Continue**.
+8. **Step 6 (Workspace Mode)**: Choose **Solo Mode** or **Team Mode** (multi-user role-based access controls) based on your company's operational hierarchy.
+9. **Step 7 (Finish)**: Click **Go to AIDA** to be redirected to the secure login screen. Use the PocketBase superuser email and password (either the ones you set in `.env`, or the ones you entered in Step 3) to log in!
 
 ---
 

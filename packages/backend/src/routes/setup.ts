@@ -37,7 +37,20 @@ interface SetWorkspaceModeRequest {
   mode?: string
 }
 
+interface BootstrapSuperuserRequest {
+  email?: string
+  password?: string
+}
+
 const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
+
+// Defense-in-depth throttle for the superuser bootstrap endpoint: per-IP,
+// in-memory only (resets on process restart — acceptable here because the
+// real, durable security gate lives in PocketBase itself (pb_hooks), which
+// checks for a fresh install on every request regardless of this counter).
+const SUPERUSER_BOOTSTRAP_RATE_LIMIT_MAX = 5
+const SUPERUSER_BOOTSTRAP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
+const superuserBootstrapAttempts = new Map<string, { count: number; windowStart: number }>()
 
 // Collections gated by the setup wizard — must all exist for setupComplete to be true.
 const REQUIRED_COLLECTIONS = [
@@ -110,6 +123,18 @@ function getRepoRoot(): string {
 }
 
 function getBackendEnvPath(): string {
+  // Test-only override so unit tests never touch the real backend .env file.
+  if (process.env.AIDA_SETUP_ENV_FILE_OVERRIDE) {
+    return process.env.AIDA_SETUP_ENV_FILE_OVERRIDE
+  }
+
+  // In Docker, AIDA_LOCAL_ENV_PATH points at a file on a persistent volume
+  // (see docker-compose.yml) so wizard-written secrets survive container
+  // restarts — index.ts reloads this same file into process.env at boot.
+  if (process.env.AIDA_LOCAL_ENV_PATH) {
+    return process.env.AIDA_LOCAL_ENV_PATH
+  }
+
   return path.join(getRepoRoot(), 'packages/backend/.env')
 }
 
@@ -508,6 +533,127 @@ export async function saveEncryptionKey(req: Request, res: Response): Promise<vo
   } catch (err: unknown) {
     console.error('[Setup] Failed to save encryption key:', err)
     res.status(500).json({ error: 'Failed to save encryption key locally' })
+  }
+}
+
+function isEnvCredentialModeActive(): boolean {
+  return Boolean(process.env.PB_ADMIN_EMAIL && process.env.PB_ADMIN_PASSWORD)
+}
+
+function checkSuperuserBootstrapRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = superuserBootstrapAttempts.get(ip)
+
+  if (!entry || now - entry.windowStart > SUPERUSER_BOOTSTRAP_RATE_LIMIT_WINDOW_MS) {
+    superuserBootstrapAttempts.set(ip, { count: 1, windowStart: now })
+    return true
+  }
+
+  if (entry.count >= SUPERUSER_BOOTSTRAP_RATE_LIMIT_MAX) {
+    return false
+  }
+
+  entry.count += 1
+  return true
+}
+
+export function resetSuperuserBootstrapRateLimitForTests(): void {
+  superuserBootstrapAttempts.clear()
+}
+
+/**
+ * GET /api/setup/superuser-bootstrap-status
+ * Tells the wizard whether the "create PocketBase superuser" step should be
+ * shown. Disabled outright when PB_ADMIN_EMAIL/PB_ADMIN_PASSWORD are set
+ * (env-credential mode); otherwise mirrors PocketBase's own fresh-install
+ * check so the UI never offers a step the server would reject.
+ */
+export async function getSuperuserBootstrapStatus(_req: Request, res: Response): Promise<void> {
+  if (isEnvCredentialModeActive()) {
+    res.status(200).json({ available: false, reason: 'env-credentials' })
+    return
+  }
+
+  try {
+    const status = await pb.send<{ available: boolean }>('/api/aida/bootstrap-superuser', { method: 'GET' })
+    res.status(200).json({ available: Boolean(status?.available) })
+  } catch (err: unknown) {
+    console.error('[Setup] Failed to read superuser bootstrap status:', err)
+    res.status(200).json({ available: false, reason: 'unreachable' })
+  }
+}
+
+/**
+ * POST /api/setup/superuser-bootstrap
+ * Creates the initial PocketBase superuser from the setup wizard when the
+ * container was started without PB_ADMIN_EMAIL/PB_ADMIN_PASSWORD. The
+ * authoritative gate (fresh install: no superusers, no application users)
+ * is enforced inside PocketBase itself (see pocketbase/pb_hooks); this
+ * handler additionally disables itself in env-credential mode and applies
+ * a per-IP rate limit as defense-in-depth.
+ */
+export async function createSuperuserViaWizard(req: Request, res: Response): Promise<void> {
+  if (isEnvCredentialModeActive()) {
+    res.status(403).json({
+      error: 'Superuser bootstrap is disabled because PB_ADMIN_EMAIL/PB_ADMIN_PASSWORD are already configured.',
+    })
+    return
+  }
+
+  const ip = req.ip || 'unknown'
+  if (!checkSuperuserBootstrapRateLimit(ip)) {
+    res.status(429).json({ error: 'Too many attempts. Please try again later.' })
+    return
+  }
+
+  const body = req.body as BootstrapSuperuserRequest
+  const email = body.email?.trim()
+  const password = body.password
+
+  if (!email || !email.includes('@')) {
+    res.status(400).json({ error: 'A valid email address is required.' })
+    return
+  }
+  if (!password || password.length < 10) {
+    res.status(400).json({ error: 'Password must be at least 10 characters long.' })
+    return
+  }
+
+  try {
+    await pb.send('/api/aida/bootstrap-superuser', {
+      method: 'POST',
+      body: { email, password },
+    })
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status
+    if (status === 403 || status === 410) {
+      res.status(403).json({ error: 'Superuser bootstrap is no longer available.' })
+      return
+    }
+    if (status === 400) {
+      res.status(400).json({ error: 'PocketBase rejected the provided email/password.' })
+      return
+    }
+    console.error('[Setup] Superuser bootstrap request to PocketBase failed:', err)
+    res.status(502).json({ error: 'Failed to create the superuser in PocketBase.' })
+    return
+  }
+
+  try {
+    await upsertEnvVariable(getBackendEnvPath(), 'PB_ADMIN_EMAIL', email)
+    await upsertEnvVariable(getBackendEnvPath(), 'PB_ADMIN_PASSWORD', password)
+    process.env.PB_ADMIN_EMAIL = email
+    process.env.PB_ADMIN_PASSWORD = password
+
+    await authenticatePocketBase()
+    await bootstrapMissingCollections()
+
+    res.status(200).json({ status: 'created' })
+  } catch (err: unknown) {
+    console.error('[Setup] Superuser was created but finishing setup failed:', err)
+    res.status(500).json({
+      error: 'Superuser was created, but finishing setup failed. Check server logs and retry the wizard.',
+    })
   }
 }
 

@@ -36,9 +36,11 @@ export async function authenticatePocketBase(maxAttempts = 10, retryDelayMs = 10
   const password = process.env.PB_ADMIN_PASSWORD
 
   if (!email || !password) {
-    throw new Error(
-      'PB_ADMIN_EMAIL and PB_ADMIN_PASSWORD environment variables must be set'
+    console.log(
+      '[PocketBase] PB_ADMIN_EMAIL/PB_ADMIN_PASSWORD are not configured. Entering local Setup Mode — ' +
+      'the server will boot without admin authentication so the setup wizard can provision the first superuser.'
     )
+    return
   }
 
   let lastErr: unknown
