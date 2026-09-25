@@ -43,6 +43,7 @@ pb_data/
 pocketbase
 pocketbase.exe
 pocketbase-*
+!pocketbase-entrypoint.sh
 
 # -----------------------------------------------------------------------------
 # Build Output & Bundling Artifacts
