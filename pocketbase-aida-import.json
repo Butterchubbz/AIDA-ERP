@@ -1,0 +1,92 @@
+{
+  "collections": [
+    {
+      "name": "refurbishedDevices",
+      "displayName": "Refurbished Devices",
+      "system": false,
+      "listRule": "@request.auth.id != ''",
+      "viewRule": "@request.auth.id != ''",
+      "createRule": "@request.auth.id != ''",
+      "updateRule": "@request.auth.id != ''",
+      "deleteRule": "@request.auth.id != ''",
+      "options": {},
+      "schema": [
+        { "name": "name", "type": "text", "required": true, "unique": false },
+        { "name": "sku", "type": "text", "required": false, "unique": false },
+        {
+          "name": "condition",
+          "type": "select",
+          "required": true,
+          "unique": false,
+          "options": { "values": ["New", "Like New", "Refurbished", "Used"] }
+        },
+        { "name": "price", "type": "number", "required": false, "unique": false },
+        { "name": "quantity", "type": "number", "required": false, "unique": false },
+        { "name": "sortOrder", "type": "number", "required": false, "unique": false },
+        { "name": "notes", "type": "text", "required": false, "unique": false }
+      ]
+    },
+    {
+      "name": "devices",
+      "displayName": "Devices",
+      "system": false,
+      "listRule": "@request.auth.id != ''",
+      "viewRule": "@request.auth.id != ''",
+      "createRule": "@request.auth.id != ''",
+      "updateRule": "@request.auth.id != ''",
+      "deleteRule": "@request.auth.id != ''",
+      "options": {},
+      "schema": [
+        { "name": "name", "type": "text", "required": true, "unique": false },
+        { "name": "sku", "type": "text", "required": false, "unique": false },
+        { "name": "onlineStock", "type": "number", "required": false, "unique": false },
+        { "name": "warehouseStock", "type": "number", "required": false, "unique": false },
+        { "name": "location", "type": "text", "required": false, "unique": false }
+      ]
+    },
+    {
+      "name": "shipments",
+      "displayName": "Shipments",
+      "system": false,
+      "listRule": "@request.auth.id != ''",
+      "viewRule": "@request.auth.id != ''",
+      "createRule": "@request.auth.id != ''",
+      "updateRule": "@request.auth.id != ''",
+      "deleteRule": "@request.auth.id != ''",
+      "options": {},
+      "schema": [
+        { "name": "trackingNumber", "type": "text", "required": false, "unique": false },
+        { "name": "carrier", "type": "text", "required": false, "unique": false },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "unique": false,
+          "options": { "values": ["Pending", "Shipped", "Delivered", "Returned"] }
+        },
+        { "name": "expectedDate", "type": "date", "required": false, "unique": false }
+      ]
+    },
+    {
+      "name": "inventory",
+      "displayName": "Inventory",
+      "system": false,
+      "listRule": "@request.auth.id != ''",
+      "viewRule": "@request.auth.id != ''",
+      "createRule": "@request.auth.id != ''",
+      "updateRule": "@request.auth.id != ''",
+      "deleteRule": "@request.auth.id != ''",
+      "options": {},
+      "schema": [
+        {
+          "name": "deviceId",
+          "type": "relation",
+          "required": true,
+          "unique": false,
+          "options": { "collectionId": "devices", "cascadeDelete": true }
+        },
+        { "name": "quantity", "type": "number", "required": true, "unique": false }
+      ]
+    }
+  ]
+}

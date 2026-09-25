@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="usersTitle usersDesc">
+  <title id="usersTitle">Generic users icon</title>
+  <desc id="usersDesc">Two user silhouettes representing user management.</desc>
+  <rect x="8" y="10" width="48" height="44" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="3"/>
+  <circle cx="26" cy="26" r="6" fill="#0f172a" stroke="#c4b5fd" stroke-width="2"/>
+  <circle cx="40" cy="24" r="5" fill="#0f172a" stroke="#c4b5fd" stroke-width="2"/>
+  <path d="M17 43c2-5 6-8 11-8s9 3 11 8" fill="none" stroke="#c4b5fd" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M35 43c1-4 4-6 8-6" fill="none" stroke="#ddd6fe" stroke-width="2" stroke-linecap="round"/>
+</svg>
