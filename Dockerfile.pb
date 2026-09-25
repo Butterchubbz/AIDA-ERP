@@ -28,6 +28,7 @@ RUN mkdir /pb_data
 # Include repository migrations so a fresh volume is initialized by PocketBase.
 WORKDIR /app
 COPY pb_migrations /app/pb_migrations
+COPY pocketbase/pb_hooks /app/pb_hooks
 COPY pocketbase-entrypoint.sh /app/pocketbase-entrypoint.sh
 RUN chmod +x /app/pocketbase-entrypoint.sh
 
