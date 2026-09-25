@@ -25,8 +25,12 @@ RUN ARCH=$(uname -m) && \
 # Create and persist pocketbase database files in a separate directory
 RUN mkdir /pb_data
 
+# Include repository migrations so a fresh volume is initialized by PocketBase.
+WORKDIR /app
+COPY pb_migrations /app/pb_migrations
+
 # Expose the PocketBase service port (internal/admin traffic)
 EXPOSE 8090
 
 # Command to serve PocketBase, allowing connections from the container network
-CMD ["pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb_data"]
+CMD ["pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb_data", "--migrationsDir=/app/pb_migrations"]

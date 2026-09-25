@@ -19,14 +19,14 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "zod": "^3.25.28",
-    "@aida/shared": "*"
+    "@aida/shared": "*",
+    "tsx": "^4.19.4"
   },
   "devDependencies": {
     "typescript": "~5.8.3",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/cookie-parser": "^1.4.8",
-    "@types/cors": "^2.8.17",
-    "tsx": "^4.19.4"
+    "@types/cors": "^2.8.17"
   }
 }
