@@ -40,7 +40,7 @@ pb_data/
 *.sqlite3
 
 # PocketBase local binary artifacts downloaded directly into the repo.
-pocketbase
+pocketbase/pb_data/
 pocketbase.exe
 pocketbase-*
 !pocketbase-entrypoint.sh
