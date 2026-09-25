@@ -442,29 +442,17 @@ async function evaluateSetupState(): Promise<SetupState> {
  * without needing to re-run the setup wizard.
  */
 export async function bootstrapMissingCollections(): Promise<void> {
-  try {
-    await ensurePocketBaseAuth()
+  await ensurePocketBaseAuth()
 
-    for (const name of REQUIRED_COLLECTIONS) {
-      try {
-        await ensureCollection(name, COLLECTION_FIELDS[name])
-      } catch (err: unknown) {
-        console.warn(`[Bootstrap] Could not ensure collection "${name}":`, err)
-      }
-    }
-
-    for (const { name, fields } of RUNTIME_COLLECTIONS) {
-      try {
-        await ensureCollection(name, fields)
-      } catch (err: unknown) {
-        console.warn(`[Bootstrap] Could not ensure runtime collection "${name}":`, err)
-      }
-    }
-
-    console.log('[Bootstrap] Required collections verified/created.')
-  } catch (err: unknown) {
-    console.warn('[Bootstrap] PocketBase not ready during collection bootstrap — skipping:', err)
+  for (const name of REQUIRED_COLLECTIONS) {
+    await ensureCollection(name, COLLECTION_FIELDS[name])
   }
+
+  for (const { name, fields } of RUNTIME_COLLECTIONS) {
+    await ensureCollection(name, fields)
+  }
+
+  console.log('[Bootstrap] Required collections verified/created.')
 }
 
 /**

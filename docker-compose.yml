@@ -10,6 +10,9 @@ services:
       dockerfile: Dockerfile.pb
     volumes:
       - pb_data:/pb_data
+    environment:
+      - PB_ADMIN_EMAIL=${PB_ADMIN_EMAIL}
+      - PB_ADMIN_PASSWORD=${PB_ADMIN_PASSWORD}
     # Expose port 8090 so administrators can access the PocketBase backend admin UI.
     # For a purely secure deployment, you can bind this locally (127.0.0.1:8090:8090)
     # or remove the ports section entirely so only the Express container has access.

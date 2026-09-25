@@ -28,9 +28,11 @@ RUN mkdir /pb_data
 # Include repository migrations so a fresh volume is initialized by PocketBase.
 WORKDIR /app
 COPY pb_migrations /app/pb_migrations
+COPY pocketbase-entrypoint.sh /app/pocketbase-entrypoint.sh
+RUN chmod +x /app/pocketbase-entrypoint.sh
 
 # Expose the PocketBase service port (internal/admin traffic)
 EXPOSE 8090
 
 # Command to serve PocketBase, allowing connections from the container network
-CMD ["pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb_data", "--migrationsDir=/app/pb_migrations"]
+ENTRYPOINT ["/app/pocketbase-entrypoint.sh"]
