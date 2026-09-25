@@ -19,9 +19,8 @@ RUN npm ci
 # Copy remaining source code
 COPY . .
 
-# Compile and build the entire workspace
-# This compiles @aida/shared, builds @aida/frontend (writing to backend/public),
-# and compiles the Express backend TS files
+# Build the shared package and frontend. The frontend build writes to
+# packages/backend/public, which Express serves in production.
 RUN npm run build
 
 # Prune development dependencies to keep the image small
@@ -41,11 +40,12 @@ ENV PORT=3001
 # Copy package descriptors and unified production node_modules
 COPY --from=builder /usr/src/app/package*.json ./
 COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/packages/shared ./packages/shared
+COPY --from=builder /usr/src/app/packages/shared/package*.json ./packages/shared/
+COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
 
-# Copy backend package elements
+# Copy backend source and package elements. The backend runs through tsx.
 COPY --from=builder /usr/src/app/packages/backend/package*.json ./packages/backend/
-COPY --from=builder /usr/src/app/packages/backend/dist ./packages/backend/dist
+COPY --from=builder /usr/src/app/packages/backend/src ./packages/backend/src
 COPY --from=builder /usr/src/app/packages/backend/public ./packages/backend/public
 
 # If node_modules exist inside the backend package in builder, copy them
@@ -54,5 +54,5 @@ COPY --from=builder /usr/src/app/packages/backend/node_modules ./packages/backen
 # Expose the unified Express server port
 EXPOSE 3001
 
-# Boot the AIDA Express backend
-CMD ["node", "packages/backend/dist/index.js"]
+# Boot the AIDA Express backend using the already-built shared package.
+CMD ["./node_modules/.bin/tsx", "packages/backend/src/index.ts"]
