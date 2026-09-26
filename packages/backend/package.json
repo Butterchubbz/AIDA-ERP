@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "npm run build --workspace=@aida/shared && tsx watch --env-file=.env src/index.ts",
     "start": "npm run build --workspace=@aida/shared && tsx --env-file=.env src/index.ts",
-    "test": "node --import tsx --test test/authorize.test.ts test/setupSuperuserBootstrap.test.ts",
+    "test": "node --import tsx --test test/authorize.test.ts test/setupSuperuserBootstrap.test.ts test/createFirstAdmin.test.ts",
     "typecheck": "tsc --noEmit",
     "import:sqlite": "tsx src/scripts/import-legacy-sqlite.ts"
   },

@@ -332,7 +332,7 @@ function buildErrorLog(
 export default function SetupPage() {
   const [searchParams] = useSearchParams();
   const steps = useMemo(
-    () => ['Welcome', 'Health Check', 'Superuser', 'Generate Key', 'Collections', 'Workspace', 'Finish'],
+    () => ['Welcome', 'Health Check', 'Superuser', 'Generate Key', 'Collections', 'Workspace', 'Admin Account', 'Finish'],
     []
   );
   const rerunMode = searchParams.get('rerun') === '1';
@@ -353,6 +353,12 @@ export default function SetupPage() {
   const [superuserEmail, setSuperuserEmail] = useState<string>('');
   const [superuserPassword, setSuperuserPassword] = useState<string>('');
   const [superuserConfirmPassword, setSuperuserConfirmPassword] = useState<string>('');
+  const [adminState, setAdminState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [adminMessage, setAdminMessage] = useState<string>('');
+  const [adminName, setAdminName] = useState<string>('');
+  const [adminEmail, setAdminEmail] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState<string>('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState<string>('');
   const [collectionResult, setCollectionResult] = useState<InitCollectionsResponse | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<'solo' | 'team' | null>(null);
@@ -402,7 +408,7 @@ export default function SetupPage() {
       }
 
       if (response.setupComplete && !rerunMode) {
-        setStepIndex(6);
+        setStepIndex(7);
       }
     } catch (err: unknown) {
       const fallbackDebug =
@@ -574,7 +580,43 @@ export default function SetupPage() {
     }
   };
 
-  const completeSetup = () => {
+  const createAdminAccount = async () => {
+    if (adminPassword !== adminConfirmPassword) {
+      setAdminState('error');
+      setAdminMessage('Passwords do not match.');
+      return;
+    }
+
+    setBusy(true);
+    setAdminState('saving');
+    setAdminMessage('');
+
+    try {
+      await apiClient.post('/api/setup/create-first-admin', {
+        name: adminName.trim(),
+        email: adminEmail.trim(),
+        password: adminPassword,
+      });
+
+      setAdminState('saved');
+      setAdminMessage('Admin account created.');
+      setAdminPassword('');
+      setAdminConfirmPassword('');
+      setStepIndex(7);
+    } catch (err: unknown) {
+      setAdminState('error');
+      setAdminMessage((err as { message?: string }).message ?? 'Could not create the admin account.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const completeSetup = async () => {
+    try {
+      await apiClient.post('/api/setup/complete', {});
+    } catch {
+      // Ignore if setup completion lock cannot be posted; proceed to navigation
+    }
     window.location.assign(rerunMode ? returnTo : '/login');
   };
 
@@ -885,13 +927,83 @@ export default function SetupPage() {
         ) : null}
 
         {stepIndex === 6 ? (
+          <section className="space-y-4 rounded-lg border border-slate-700 bg-slate-800/80 p-6">
+            <h2 className="text-xl font-semibold text-slate-100">Step 7: Create Admin Account</h2>
+            <p className="text-slate-300">
+              Create your primary application administrator account. You will use this account to log in to AIDA.
+            </p>
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-300">
+                Name
+                <input
+                  type="text"
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  autoComplete="name"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Email
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  autoComplete="username"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Password
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Confirm Password
+                <input
+                  type="password"
+                  value={adminConfirmPassword}
+                  onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="mt-1 w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-slate-400">Password must be at least 10 characters.</p>
+            {adminMessage ? (
+              <p className={`text-sm ${adminState === 'error' ? 'text-rose-300' : 'text-emerald-300'}`} role="status">
+                {adminMessage}
+              </p>
+            ) : null}
+            <button
+              onClick={() => void createAdminAccount()}
+              disabled={
+                busy ||
+                !adminName.trim() ||
+                !adminEmail.trim() ||
+                adminPassword.length < 10 ||
+                adminPassword !== adminConfirmPassword
+              }
+              className="rounded-md bg-cyan-500 px-4 py-2 font-semibold text-slate-900 hover:bg-cyan-400 disabled:opacity-50"
+            >
+              {busy ? 'Creating...' : 'Create Admin Account'}
+            </button>
+          </section>
+        ) : null}
+
+        {stepIndex === 7 ? (
           <section className="rounded-lg border border-emerald-500/40 bg-emerald-900/20 p-6">
             <h2 className="text-xl font-semibold text-emerald-200">Setup Complete</h2>
             <p className="mt-3 text-emerald-100">
               {rerunMode ? 'Setup checks are complete. You can return to AIDA.' : 'AIDA is ready. You can continue to login.'}
             </p>
             <button
-              onClick={completeSetup}
+              onClick={() => void completeSetup()}
               className="mt-4 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-slate-900 hover:bg-emerald-300"
             >
               {rerunMode ? 'Return to AIDA' : 'Go to AIDA'}

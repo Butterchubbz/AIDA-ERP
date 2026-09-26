@@ -122,6 +122,7 @@ import {
   completeSetupWizard,
   getSuperuserBootstrapStatus,
   createSuperuserViaWizard,
+  createFirstAdmin,
 } from './routes/setup.js'
 
 /**
@@ -232,6 +233,7 @@ app.post('/api/setup/superuser-bootstrap', requireSetupAccess, createSuperuserVi
 app.post('/api/setup/save-encryption-key', requireSetupAccess, saveEncryptionKey)
 app.post('/api/setup/init-collections', requireSetupAccess, initCollections)
 app.post('/api/setup/set-workspace-mode', requireSetupAccess, setWorkspaceMode)
+app.post('/api/setup/create-first-admin', requireSetupAccess, createFirstAdmin)
 app.post('/api/setup/complete', requireSetupAccess, completeSetupWizard)
 app.get('/api/setup/owner-lock-status', requireAuth, requireModule('Admin', 'Viewer'), getOwnerLockStatus)
 
