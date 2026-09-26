@@ -1,37 +1,67 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
-  const collection = app.findCollectionByNameOrId("pbc_3318608420")
+  let collection
+  try {
+    collection = app.findCollectionByNameOrId("pbc_3318608420")
+  } catch {
+    try {
+      collection = app.findCollectionByNameOrId("userPreferences")
+    } catch {
+      return
+    }
+  }
 
-  // add field
-  collection.fields.addAt(9, new Field({
-    "autogeneratePattern": "",
-    "hidden": false,
-    "id": "text2970471214",
-    "max": 0,
-    "min": 0,
-    "name": "setupOwnerEmail",
-    "pattern": "",
-    "presentable": false,
-    "primaryKey": false,
-    "required": false,
-    "system": false,
-    "type": "text"
-  }))
+  let hasEmail = false
+  let hasLogin = false
+  try {
+    if (collection.fields.getByName("setupOwnerEmail")) {
+      hasEmail = true
+    }
+  } catch {}
+  try {
+    if (collection.fields.getByName("setupOwnerLastLoginAt")) {
+      hasLogin = true
+    }
+  } catch {}
 
-  // add field
-  collection.fields.addAt(10, new Field({
-    "hidden": false,
-    "id": "date2278455903",
-    "max": "",
-    "min": "",
-    "name": "setupOwnerLastLoginAt",
-    "presentable": false,
-    "required": false,
-    "system": false,
-    "type": "date"
-  }))
+  let changed = false
 
-  return app.save(collection)
+  if (!hasEmail) {
+    collection.fields.addAt(collection.fields.length, new Field({
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text2970471214",
+      "max": 0,
+      "min": 0,
+      "name": "setupOwnerEmail",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    }))
+    changed = true
+  }
+
+  if (!hasLogin) {
+    collection.fields.addAt(collection.fields.length, new Field({
+      "hidden": false,
+      "id": "date2278455903",
+      "max": "",
+      "min": "",
+      "name": "setupOwnerLastLoginAt",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "date"
+    }))
+    changed = true
+  }
+
+  if (changed) {
+    return app.save(collection)
+  }
 }, (app) => {
   const collection = app.findCollectionByNameOrId("pbc_3318608420")
 

@@ -1,5 +1,12 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
+  try {
+    app.findCollectionByNameOrId("inventoryWorkspaces");
+    return;
+  } catch {
+    // collection does not exist, proceed to create
+  }
+
   const collection = new Collection({
     "createRule": null,
     "deleteRule": null,

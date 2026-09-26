@@ -1,5 +1,12 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
+  try {
+    app.findCollectionByNameOrId('auditLog')
+    return
+  } catch {
+    // proceed to create
+  }
+
   const collection = new Collection({
     name: 'auditLog',
     type: 'base',
