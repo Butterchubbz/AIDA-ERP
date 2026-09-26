@@ -42,6 +42,12 @@ interface BootstrapSuperuserRequest {
   password?: string
 }
 
+interface CreateFirstAdminRequest {
+  name?: string
+  email?: string
+  password?: string
+}
+
 const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
 
 // Defense-in-depth throttle for the superuser bootstrap endpoint: per-IP,
@@ -477,6 +483,11 @@ export async function bootstrapMissingCollections(): Promise<void> {
     await ensureCollection(name, fields)
   }
 
+  await patchMissingFields('users', [
+    { name: 'name', type: 'text' },
+    { name: 'role', type: 'text' },
+  ])
+
   console.log('[Bootstrap] Required collections verified/created.')
 }
 
@@ -741,6 +752,88 @@ export async function setWorkspaceMode(req: Request, res: Response): Promise<voi
   } catch (err: unknown) {
     console.error('[Setup] setWorkspaceMode failed:', err)
     res.status(500).json({ error: 'Failed to save workspace mode' })
+  }
+}
+
+/**
+ * POST /api/setup/create-first-admin
+ * Creates the initial application admin user from the setup wizard.
+ * Authoritative security gate: only allowed when the users collection
+ * has zero records (403 if a user already exists).
+ */
+export async function createFirstAdmin(req: Request, res: Response): Promise<void> {
+  const body = req.body as CreateFirstAdminRequest
+  const name = body.name?.trim()
+  const email = body.email?.trim()
+  const password = body.password
+
+  if (!name) {
+    res.status(400).json({ error: 'Name is required.' })
+    return
+  }
+  if (!email || !email.includes('@')) {
+    res.status(400).json({ error: 'A valid email address is required.' })
+    return
+  }
+  if (!password || password.length < 10) {
+    res.status(400).json({ error: 'Password must be at least 10 characters long.' })
+    return
+  }
+
+  try {
+    await ensurePocketBaseAuth()
+
+    await patchMissingFields('users', [
+      { name: 'name', type: 'text' },
+      { name: 'role', type: 'text' },
+    ])
+
+    const existingUsers = await (pb as any).collection('users').getList(1, 1)
+    if (existingUsers?.items && existingUsers.items.length > 0) {
+      res.status(403).json({ error: 'Admin user creation is no longer available.' })
+      return
+    }
+
+    const normalizedEmail = email.toLowerCase()
+
+    const userRecord = await pb.collection('users').create({
+      name,
+      email: normalizedEmail,
+      password,
+      passwordConfirm: password,
+      role: 'Admin',
+      verified: true,
+      emailVisibility: true,
+    })
+
+    const existingPrefs = await pb
+      .collection('userPreferences')
+      .getFirstListItem(pb.filter('userId = {:userId}', { userId: 'system' }), { requestKey: null })
+      .catch(() => null)
+
+    if (existingPrefs) {
+      await pb.collection('userPreferences').update(existingPrefs.id, {
+        setupOwnerEmail: normalizedEmail,
+      })
+    } else {
+      await pb.collection('userPreferences').create({
+        userId: 'system',
+        setupOwnerEmail: normalizedEmail,
+      })
+    }
+
+    res.status(200).json({
+      status: 'created',
+      user: {
+        id: userRecord.id,
+        name,
+        email: normalizedEmail,
+        role: 'Admin',
+      },
+    })
+  } catch (err: unknown) {
+    console.error('[Setup] Failed to create first admin:', err)
+    res.status(500).json({ error: 'Failed to create initial admin user.' })
   }
 }
 
