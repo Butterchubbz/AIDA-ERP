@@ -11,31 +11,72 @@
  * entrypoint script) it permanently 403s for the lifetime of the data volume.
  *
  * Compatible with PocketBase v0.30.0.
+ *
+ * Note: routerAdd() handlers run in an isolated scope, so each handler
+ * defines its own copy of aidaBootstrapIsFresh() inline.
+ * Record, DynamicModel, ForbiddenError, BadRequestError are VM globals and
+ * need no import.
  */
 
 /// <reference path="../pb_data/types.d.ts" />
 
-function aidaBootstrapIsFresh(app) {
-  if (app.countRecords('_superusers') > 0) {
-    return false
-  }
-
-  try {
-    if (app.countRecords('users') > 0) {
+routerAdd('GET', '/api/aida/bootstrap-superuser', (e) => {
+  function aidaBootstrapIsFresh(app) {
+    if (app.countRecords('_superusers') > 0) {
+      var installers = app.findRecordsByFilter(
+        '_superusers',
+        "email = '__pbinstaller@example.com'",
+        '',
+        100,
+        0
+      )
+      if (installers.length >= app.countRecords('_superusers')) {
+        return true
+      }
       return false
     }
-  } catch (e) {
-    // "users" collection doesn't exist yet on a truly fresh volume — treat as no users.
+
+    try {
+      if (app.countRecords('users') > 0) {
+        return false
+      }
+    } catch (e) {
+      // "users" collection doesn't exist yet on a truly fresh volume — treat as no users.
+    }
+
+    return true
   }
 
-  return true
-}
-
-routerAdd('GET', '/api/aida/bootstrap-superuser', (e) => {
   return e.json(200, { available: aidaBootstrapIsFresh($app) })
 })
 
 routerAdd('POST', '/api/aida/bootstrap-superuser', (e) => {
+  function aidaBootstrapIsFresh(app) {
+    if (app.countRecords('_superusers') > 0) {
+      var installers = app.findRecordsByFilter(
+        '_superusers',
+        "email = '__pbinstaller@example.com'",
+        '',
+        100,
+        0
+      )
+      if (installers.length >= app.countRecords('_superusers')) {
+        return true
+      }
+      return false
+    }
+
+    try {
+      if (app.countRecords('users') > 0) {
+        return false
+      }
+    } catch (e) {
+      // "users" collection doesn't exist yet on a truly fresh volume — treat as no users.
+    }
+
+    return true
+  }
+
   if (!aidaBootstrapIsFresh($app)) {
     throw new ForbiddenError('Superuser bootstrap is no longer available.')
   }
