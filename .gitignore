@@ -51,7 +51,10 @@ pocketbase-*
 dist/
 **/dist/
 packages/frontend/dist/
-packages/backend/public/assets/
+packages/backend/public/
+packages/frontend/pb_public/
+packages/pb_public/
+pb_public/
 
 # Vite and build tooling caches.
 .vite/
