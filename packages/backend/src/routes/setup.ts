@@ -10,7 +10,7 @@ import {
   SETUP_OWNER_WARNING_WINDOW_DAYS,
 } from '../lib/setupOwnerLock.js'
 
-type SetupCheck = 'ok' | 'missing' | 'invalid' | 'fail'
+type SetupCheck = 'ok' | 'missing' | 'invalid' | 'fail' | 'exists'
 type CollectionCheck = 'exists' | 'created' | 'missing' | 'failed'
 
 interface SetupState {
@@ -26,6 +26,7 @@ interface SetupState {
   inventoryItems: CollectionCheck
   euReturns: CollectionCheck
   shippingHistory: CollectionCheck
+  users: CollectionCheck
   setupComplete: boolean
 }
 
@@ -403,7 +404,7 @@ const COLLECTION_FIELDS: Record<RequiredCollection, Array<Record<string, unknown
   shippingHistory: shippingHistoryFields,
 }
 
-async function evaluateSetupState(): Promise<SetupState> {
+export async function evaluateSetupState(): Promise<SetupState> {
   const encryptionKeyStatus: SetupCheck = isValidEncryptionKey(process.env.AIDA_ENCRYPTION_KEY)
     ? 'ok'
     : process.env.VITE_ENCRYPTION_KEY
@@ -430,6 +431,7 @@ async function evaluateSetupState(): Promise<SetupState> {
       inventoryItems: 'failed',
       euReturns: 'failed',
       shippingHistory: 'failed',
+      users: 'failed',
       setupComplete: false,
     } satisfies SetupState
   }
@@ -448,7 +450,16 @@ async function evaluateSetupState(): Promise<SetupState> {
     (name) => collectionStatuses[name] === 'exists'
   )
 
-  const setupComplete = encryptionKeyStatus === 'ok' && allCollectionsExist
+  let usersCheck: CollectionCheck = 'missing'
+  try {
+    const userList = await pb.collection('users').getList(1, 1)
+    usersCheck = userList.items.length > 0 ? 'exists' : 'missing'
+  } catch {
+    usersCheck = 'failed'
+  }
+
+  const setupComplete =
+    encryptionKeyStatus === 'ok' && allCollectionsExist && usersCheck === 'exists'
 
   return {
     encryptionKey: encryptionKeyStatus,
@@ -463,6 +474,7 @@ async function evaluateSetupState(): Promise<SetupState> {
     inventoryItems: collectionStatuses.inventoryItems ?? 'failed',
     euReturns: collectionStatuses.euReturns ?? 'failed',
     shippingHistory: collectionStatuses.shippingHistory ?? 'failed',
+    users: usersCheck,
     setupComplete,
   }
 }
@@ -520,6 +532,7 @@ export async function checkSetupHealth(_req: Request, res: Response): Promise<vo
       inventoryAccessory: setup.inventoryAccessory,
       stockHistory: setup.stockHistory,
       wcUnknownSkus: setup.wcUnknownSkus,
+      users: setup.users,
     },
   })
 }

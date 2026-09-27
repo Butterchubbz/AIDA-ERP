@@ -25,6 +25,7 @@ interface HealthResponse {
     inventoryItems: CollectionCheck
     euReturns: CollectionCheck
     shippingHistory: CollectionCheck
+    users?: CollectionCheck
   }
 }
 
