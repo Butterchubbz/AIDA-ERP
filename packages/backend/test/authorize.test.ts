@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import jwt from 'jsonwebtoken'
-import { ROLE_PERMISSIONS, type AppRole, type ModuleName, type User } from '@aida/shared'
+import { ROLE_MODULES, ROLE_PERMISSIONS, isModuleAllowed, type AppRole, type ModuleName, type User } from '@aida/shared'
 import pb from '../src/lib/pocketbase.js'
 import { requireModule } from '../src/middleware/authorize.js'
 import { auditMutations, sanitizeAuditChanges, writeAuditRecord } from '../src/middleware/audit.js'
@@ -457,4 +457,93 @@ test('role changes cannot target the requester and unknown user fields are strip
   } finally {
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
   }
+})
+
+test('Viewer POST (write) to an Inventory endpoint returns 403 after isModuleAllowed pre-check', () => {
+  const viewer = createViewerFromJwt()
+  assert.equal(viewer.role, 'Viewer')
+
+  // Step 1: Pre-check verification - Viewer is allowed the Inventory module at the top level
+  assert.equal(
+    isModuleAllowed(viewer.role, 'Inventory'),
+    true,
+    'Viewer role must pass the top-level isModuleAllowed check for Inventory'
+  )
+
+  // Step 2: Write attempt verification - requireModule('Inventory', 'Editor') blocks with 403
+  const response = createResponse()
+  let nextCalled = false
+
+  requireModule('Inventory', 'Editor')(
+    { user: viewer, method: 'POST', path: '/api/inventory/items' } as never,
+    response as never,
+    () => {
+      nextCalled = true
+    }
+  )
+
+  assert.equal(response.statusCode, 403, 'Viewer write must be rejected with 403')
+  assert.deepEqual(response.body, { error: 'Forbidden' })
+  assert.equal(nextCalled, false, 'next() must not be called on forbidden write')
+})
+
+test('Consistency: for every role in ROLE_MODULES and every route wrapped in RequireModule in App.tsx, frontend can(route) === backend isModuleAllowed(role, module)', () => {
+  // Routes wrapped in RequireModule in App.tsx with their configured module requirement
+  const routesWrappedInRequireModule = [
+    { route: 'forecasting/settings', module: 'settings/forecasting' },
+    { route: '/forecasting/settings', module: 'settings/forecasting' },
+    { route: 'users', module: 'Admin' },
+    { route: '/users', module: 'Admin' },
+    { route: 'data', module: 'Admin' },
+    { route: '/data', module: 'Admin' },
+    { route: 'integrations', module: 'Admin' },
+    { route: '/integrations', module: 'Admin' },
+  ] as const
+
+  const roles = Object.keys(ROLE_MODULES) as AppRole[]
+  const mismatches: Array<{
+    role: AppRole
+    route: string
+    module: string
+    frontendCan: boolean
+    backendAllowed: boolean
+  }> = []
+
+  for (const role of roles) {
+    // Frontend can(route) helper simulates AuthContext.can:
+    // can(moduleOrRoute) => isModuleAllowed(user.role, moduleOrRoute)
+    const frontendCan = (targetRoute: string) => isModuleAllowed(role, targetRoute)
+
+    for (const { route, module } of routesWrappedInRequireModule) {
+      const feAllowed = frontendCan(route)
+      const beAllowed = isModuleAllowed(role, module)
+
+      if (feAllowed !== beAllowed) {
+        mismatches.push({
+          role,
+          route,
+          module,
+          frontendCan: feAllowed,
+          backendAllowed: beAllowed,
+        })
+      }
+    }
+  }
+
+  // Report any mismatches clearly instead of fixing silently
+  assert.deepEqual(
+    mismatches,
+    [],
+    `Role-to-module consistency mismatches found: ${JSON.stringify(mismatches, null, 2)}`
+  )
+})
+
+test('isModuleAllowed normalizes case, slashes, and aliases via ROUTE_TO_MODULE', () => {
+  assert.equal(isModuleAllowed('Admin', '/users/'), true)
+  assert.equal(isModuleAllowed('Admin', 'USERS'), true)
+  assert.equal(isModuleAllowed('Manager', '/users'), false)
+  assert.equal(isModuleAllowed('Manager', '/forecasting/settings/'), true)
+  assert.equal(isModuleAllowed('Manager', 'settings/forecasting'), true)
+  assert.equal(isModuleAllowed('Viewer', '/inventory/devices'), true)
+  assert.equal(isModuleAllowed('Viewer', 'INVENTORY'), true)
 })

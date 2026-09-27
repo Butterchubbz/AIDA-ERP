@@ -1,12 +1,14 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import type { User, UserRoles } from '@aida/shared';
+import { isModuleAllowed, type User, type UserRoles, type AppRole } from '@aida/shared';
 import { ApiError, apiClient, isApiError } from '../lib/apiClient';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
+  role: AppRole | null;
   isLoggedIn: boolean;
   userRoles: UserRoles | null;
+  can: (module: string) => boolean;
   login: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
   loadingAuth: boolean;
@@ -66,14 +68,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const value: AuthContextType = {
-    user,
-    isLoggedIn: !!user,
-    userRoles: user?.roles ?? null,
-    login,
-    logout,
-    loadingAuth,
-  };
+  const can = useCallback(
+    (module: string): boolean => {
+      if (!user) return false;
+      return isModuleAllowed(user.role, module);
+    },
+    [user]
+  );
+
+  const value: AuthContextType = useMemo(
+    () => ({
+      user,
+      role: user?.role ?? null,
+      isLoggedIn: !!user,
+      userRoles: user?.roles ?? null,
+      can,
+      login,
+      logout,
+      loadingAuth,
+    }),
+    [user, can, loadingAuth]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

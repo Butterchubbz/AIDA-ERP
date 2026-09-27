@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Truck, Undo2 } from 'lucide-react';
 import { useModeStore } from '../../stores/mode';
+import { useAuth } from '../../context/AuthContext';
 
-const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null }) => {
+const Sidebar = (_props?: { userRoles?: { [key: string]: string } | null }) => {
+  const { can } = useAuth();
   const location = useLocation();
   const { isTeam } = useModeStore();
   const currentYear = new Date().getFullYear();
@@ -73,7 +75,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </NavLink>
           </li>
 
-          {userRoles?.['RMA Tracker'] && userRoles['RMA Tracker'] !== 'None' && (
+          {can('RMA Tracker') && (
             <li>
               <NavLink
                 to="/logistics/returns"
@@ -87,7 +89,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.Inventory && userRoles.Inventory !== 'None' && (
+          {can('Inventory') && (
             <li>
               <button
                 onClick={() => setInventoryOpen(!isInventoryOpen)}
@@ -128,7 +130,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.Forecasting && userRoles.Forecasting !== 'None' && (
+          {can('Forecasting') && (
             <li>
               <button
                 onClick={() => setForecastingOpen(!isForecastingOpen)}
@@ -154,11 +156,13 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
                       Components
                     </NavLink>
                   </li>
-                  <li>
-                    <NavLink to="/forecasting/settings" className={getSubNavLinkClass}>
-                      Settings
-                    </NavLink>
-                  </li>
+                  {can('settings/forecasting') && (
+                    <li>
+                      <NavLink to="/forecasting/settings" className={getSubNavLinkClass}>
+                        Settings
+                      </NavLink>
+                    </li>
+                  )}
                   <li>
                     <NavLink to="/forecasting/purchase-order" className={getSubNavLinkClass}>
                       Purchase Orders
@@ -169,7 +173,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.Amazon && userRoles.Amazon !== 'None' && (
+          {can('Amazon') && (
             <li>
               <button
                 onClick={() => setAmazonOpen(!isAmazonOpen)}
@@ -205,8 +209,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {((userRoles?.Orders && userRoles.Orders !== 'None') ||
-            (userRoles?.['RMA Tracker'] && userRoles['RMA Tracker'] !== 'None')) && (
+          {(can('Orders') || can('RMA Tracker')) && (
             <li>
               <button
                 onClick={() => setOrdersOpen(!isOrdersOpen)}
@@ -222,7 +225,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
               </button>
               {isOrdersOpen && (
                 <ul className="mt-2 space-y-2">
-                  {userRoles?.Orders && userRoles.Orders !== 'None' && (
+                  {can('Orders') && (
                     <li>
                       <NavLink to="/quotes/approved" className={getSubNavLinkClass}>
                         Quote Approved
@@ -234,7 +237,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.['Inbound Shipments'] && userRoles['Inbound Shipments'] !== 'None' && (
+          {can('Inbound Shipments') && (
             <li>
               <NavLink to="/shipments/inbound" className={getNavLinkClass}>
                 <span className="flex items-center gap-3">
@@ -245,7 +248,7 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
             </li>
           )}
 
-          {userRoles?.['Inbound Shipments'] && userRoles['Inbound Shipments'] !== 'None' && (
+          {can('Inbound Shipments') && (
             <li>
               <button
                 onClick={() => setLogisticsOpen(!isLogisticsOpen)}
@@ -295,19 +298,21 @@ const Sidebar = ({ userRoles }: { userRoles: { [key: string]: string } | null })
                     My Profile
                   </NavLink>
                 </li>
-                <li>
-                  <NavLink to="/integrations" className={getSubNavLinkClass}>
-                    Integrations
-                  </NavLink>
-                </li>
-                {isTeam && (userRoles?.Admin === 'Editor' || userRoles?.Admin === 'Admin') && (
+                {can('Admin') && (
+                  <li>
+                    <NavLink to="/integrations" className={getSubNavLinkClass}>
+                      Integrations
+                    </NavLink>
+                  </li>
+                )}
+                {isTeam && can('Admin') && (
                   <li>
                     <NavLink to="/users" className={getSubNavLinkClass}>
                       User Management
                     </NavLink>
                   </li>
                 )}
-                {userRoles?.Admin === 'Editor' && (
+                {can('Admin') && (
                   <li>
                     <NavLink to="/data" className={getSubNavLinkClass}>
                       Data Management

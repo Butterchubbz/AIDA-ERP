@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import RequireModule from './components/common/RequireModule';
 import Layout from './components/common/Layout';
 import { detectFirstRun, type FirstRunStatus } from './lib/firstRun';
 import { useAuth } from './context/AuthContext';
@@ -110,7 +111,15 @@ function App() {
           <Route path="forecasting/devices" element={<DeviceForecastingView />} />
           <Route path="forecasting/component" element={<ComponentForecastingView />} />
           <Route path="forecasting/purchase-order" element={<PurchaseOrderView />} />
-          <Route path="forecasting/settings" element={<ForecastingSettingsView />} />
+          <Route
+            path="forecasting/settings"
+            element={
+              <RequireModule module="settings/forecasting">
+                <ForecastingSettingsView />
+              </RequireModule>
+            }
+          />
+          <Route path="settings/forecasting" element={<Navigate to="/forecasting/settings" replace />} />
           <Route path="amazon" element={<AmazonView />} />
           <Route path="amazon/processing" element={<AmazonProcessingView />} />
           <Route path="amazon/outgoing" element={<AmazonOutgoingView />} />
@@ -120,9 +129,30 @@ function App() {
           <Route path="logistics/shipping" element={<ShippingHistoryView />} />
           <Route path="inventory/rma" element={<RMATrackerView />} />
           <Route path="profile" element={<ProfileView />} />
-          <Route path="users" element={<UserManagementView />} />
-          <Route path="data" element={<DataManagementView />} />
-          <Route path="integrations" element={<IntegrationsView />} />
+          <Route
+            path="users"
+            element={
+              <RequireModule module="Admin">
+                <UserManagementView />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="data"
+            element={
+              <RequireModule module="Admin">
+                <DataManagementView />
+              </RequireModule>
+            }
+          />
+          <Route
+            path="integrations"
+            element={
+              <RequireModule module="Admin">
+                <IntegrationsView />
+              </RequireModule>
+            }
+          />
           <Route path="management" element={<Navigate to="/data" replace />} />
         </Route>
         <Route
