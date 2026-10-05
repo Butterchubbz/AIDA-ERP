@@ -5,6 +5,8 @@ import { useRMAs } from '../hooks/useRMAs';
 import { useForecasting } from '../hooks/useForecasting';
 import { Line, LineChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { baseTooltipStyle, chartPalette } from '../components/common/chartConfig';
+import Card from '../components/common/Card';
+import PageContainer from '../components/common/PageContainer';
 
 const Dashboard = () => {
   const { devices: inventory, loading: loadingInventory, error: errorInventory } = useDeviceInventory();
@@ -63,46 +65,43 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div>
-        <h1 className="text-3xl font-bold text-cyan-400 mb-6">Dashboard</h1>
+      <PageContainer title="Dashboard" variant="plain">
         <p className="text-slate-400 text-center py-8">Loading dashboard data...</p>
-      </div>
+      </PageContainer>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <h1 className="text-3xl font-bold text-cyan-400 mb-6">Dashboard</h1>
+      <PageContainer title="Dashboard" variant="plain">
         <p className="text-red-500 text-center py-8">Error loading dashboard data: {error}</p>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-cyan-400 mb-6">Dashboard</h1>
+    <PageContainer title="Dashboard" variant="plain">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-slate-800 p-6 rounded-lg shadow-lg text-center">
+        <Card className="text-center">
           <p className="text-sm text-slate-400 uppercase">Total Inventory Items</p>
           <p className="text-4xl font-bold text-white mt-2">{totalInventoryItems}</p>
-        </div>
-        <div className="bg-slate-800 p-6 rounded-lg shadow-lg text-center">
+        </Card>
+        <Card className="text-center">
           <p className="text-sm text-slate-400 uppercase">Total Shipments</p>
           <p className="text-4xl font-bold text-white mt-2">{totalShipments}</p>
-        </div>
-        <div className="bg-slate-800 p-6 rounded-lg shadow-lg text-center">
+        </Card>
+        <Card className="text-center">
           <p className="text-sm text-slate-400 uppercase">In-Transit Shipments</p>
           <p className="text-4xl font-bold text-white mt-2">{inTransitShipments}</p>
-        </div>
-        <div className="bg-slate-800 p-6 rounded-lg shadow-lg text-center">
+        </Card>
+        <Card className="text-center">
           <p className="text-sm text-slate-400 uppercase">Incoming RMAs</p>
           <p className="text-4xl font-bold text-white mt-2">{incomingRMAs}</p>
-        </div>
+        </Card>
       </div>
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
-        <div className="bg-slate-800 p-6 rounded-lg shadow-lg">
+        <Card>
           <h2 className="text-lg font-semibold text-cyan-300">Forecast Summary</h2>
           <div className="mt-4 space-y-2 text-sm text-slate-300">
             <p>Total forecasted SKUs: <span className="text-white font-semibold">{forecastMerged.length}</span></p>
@@ -110,9 +109,9 @@ const Dashboard = () => {
             <p>Warning within 2 weeks: <span className="text-amber-300 font-semibold">{warningForecast}</span></p>
             <p>Average velocity/week: <span className="text-cyan-300 font-semibold">{avgVelocity.toFixed(1)}</span></p>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-slate-800 p-6 rounded-lg shadow-lg">
+        <Card>
           <h2 className="text-lg font-semibold text-cyan-300 mb-3">Velocity Sparkline</h2>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -125,9 +124,9 @@ const Dashboard = () => {
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

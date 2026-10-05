@@ -177,41 +177,41 @@ const InventoryAccessoriesView: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[calc(100vh-18rem)] overflow-auto">
           <table className="min-w-full divide-y divide-slate-700">
-            <thead className="bg-slate-700">
+            <thead className="sticky top-0 z-10 bg-slate-700">
               <tr>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                  className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                   onClick={() => handleSort('sku')}
                 >
                   SKU {getSortIndicator(sortColumn, 'sku', sortDirection)}
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                  className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                   onClick={() => handleSort('name')}
                 >
                   Name {getSortIndicator(sortColumn, 'name', sortDirection)}
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                  className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                   onClick={() => handleSort('onlineStock')}
                 >
                   Online Stock {getSortIndicator(sortColumn, 'onlineStock', sortDirection)}
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                  className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                   onClick={() => handleSort('countedStock')}
                 >
                   Counted Stock {getSortIndicator(sortColumn, 'countedStock', sortDirection)}
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                  className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                   onClick={() => handleSort('warehouseStock')}
                 >
                   Warehouse Stock {getSortIndicator(sortColumn, 'warehouseStock', sortDirection)}
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -222,22 +222,22 @@ const InventoryAccessoriesView: React.FC = () => {
                   key={item.id}
                   className={`hover:bg-slate-800 ${index % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800'}`}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                  <td className="p-card whitespace-nowrap text-sm text-slate-300">
                     {item.sku}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-100">
+                  <td className="p-card whitespace-nowrap text-sm font-medium text-slate-100">
                     {item.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-300 font-bold">
+                  <td className="p-card whitespace-nowrap text-sm text-blue-300 font-bold">
                     {item.onlineStock || 0}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-300 font-bold">
+                  <td className="p-card whitespace-nowrap text-sm text-green-300 font-bold">
                     {item.countedStock || 0}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300 font-bold">
+                  <td className="p-card whitespace-nowrap text-sm text-slate-300 font-bold">
                     {item.warehouseStock || 0}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="p-card whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       {canAddDeleteEdit && (
                         <>

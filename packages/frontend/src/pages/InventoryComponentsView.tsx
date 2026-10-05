@@ -445,35 +445,35 @@ function InventoryComponentsView() {
             <p>Add a new component to get started.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[calc(100vh-18rem)] overflow-auto">
             <table className="min-w-full divide-y divide-slate-700">
-              <thead className="bg-slate-700">
+              <thead className="sticky top-0 z-10 bg-slate-700">
                 <tr>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('sku')}
                   >
                     SKU {getSortIndicator(sortColumn, 'sku', sortDirection)}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('name')}
                   >
                     Component Name {getSortIndicator(sortColumn, 'name', sortDirection)}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('onlineStock')}
                   >
                     Online Stock {getSortIndicator(sortColumn, 'onlineStock', sortDirection)}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('countedStock')}
                   >
                     Counted Stock {getSortIndicator(sortColumn, 'countedStock', sortDirection)}
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -482,7 +482,7 @@ function InventoryComponentsView() {
                 <React.Fragment key={categoryName}>
                   <tbody className="bg-slate-800 divide-y divide-slate-700">
                     <tr className="bg-slate-900/70">
-                      <td colSpan={5} className="px-4 py-2 text-lg font-bold text-cyan-300">
+                      <td colSpan={5} className="p-card text-lg font-bold text-cyan-300">
                         {categoryName}
                       </td>
                     </tr>
@@ -501,7 +501,7 @@ function InventoryComponentsView() {
                           <tr className="bg-slate-800/50">
                             <td
                               colSpan={5}
-                              className="px-8 py-1 text-md font-semibold text-blue-300"
+                              className="p-card text-md font-semibold text-blue-300"
                             >
                               {subcategoryName}
                             </td>
@@ -522,22 +522,24 @@ function InventoryComponentsView() {
                                     className={`hover:bg-slate-700 ${
                                       highlightRow
                                         ? 'bg-red-900/20 text-red-400 hover:bg-red-900/30'
-                                        : ''
+                                        : index % 2 === 0
+                                          ? 'bg-slate-900/60'
+                                          : 'bg-slate-800/60'
                                     }`}
                                   >
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                    <td className="p-card whitespace-nowrap text-sm text-slate-300">
                                       {item.sku}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-100">
+                                    <td className="p-card whitespace-nowrap text-sm font-medium text-slate-100">
                                       {item.name}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-300 font-bold">
+                                    <td className="p-card whitespace-nowrap text-sm text-blue-300 font-bold">
                                       {item.onlineStock || 0}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-300 font-bold">
+                                    <td className="p-card whitespace-nowrap text-sm text-green-300 font-bold">
                                       {item.countedStock || 0}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td className="p-card whitespace-nowrap text-right text-sm font-medium">
                                       <div className="flex justify-end space-x-2">
                                         {canAddDeleteEdit && (
                                           <>
