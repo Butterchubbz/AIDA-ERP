@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import ConnectModal from '../components/integrations/ConnectModal'
 import IntegrationCard from '../components/integrations/IntegrationCard'
 import AddToInventoryModal from '../components/integrations/AddToInventoryModal'
+import PageContainer from '../components/common/PageContainer'
 import { useIntegrations, type RegistryEntry } from '../hooks/useIntegrations'
 import { apiClient } from '../lib/apiClient'
 
@@ -195,8 +196,9 @@ export default function IntegrationsView() {
 
   if (error && !loading && registry.length === 0) {
     return (
-      <section className="rounded-xl border border-red-800 bg-slate-800 p-6 text-slate-100">
-        <h2 className="text-2xl font-semibold text-red-300">Integrations Unavailable</h2>
+      <PageContainer
+        title="Integrations Unavailable"
+      >
         <p className="mt-2 text-sm text-slate-300">{error}</p>
         <button
           type="button"
@@ -205,22 +207,23 @@ export default function IntegrationsView() {
         >
           Retry
         </button>
-      </section>
+      </PageContainer>
     )
   }
 
   return (
     <section className="space-y-6 text-slate-100">
-      <header className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-xl">
-        <h1 className="text-3xl font-bold text-cyan-300">Integrations</h1>
-        <p className="mt-2 text-sm text-slate-300">Connect external services to import data into AIDA.</p>
+      <PageContainer
+        title="Integrations"
+        subtitle="Connect external services to import data into AIDA."
+      >
         <div className="mt-4 rounded-md border border-amber-700 bg-amber-950/40 px-4 py-3 text-sm text-amber-200">
           AIDA is designed for internal network use only. Keep this dashboard off the public internet.
         </div>
         <div className="mt-3 rounded-md border border-slate-600 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
           Imports are read-only. Data flows from your store into AIDA. AIDA does not write changes back to WooCommerce.
         </div>
-      </header>
+      </PageContainer>
 
       {unknownSkuCount > 0 && (
         <div className="rounded-xl border border-amber-600 bg-amber-950/30 p-4">

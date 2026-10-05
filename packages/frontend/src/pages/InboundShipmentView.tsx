@@ -8,6 +8,7 @@ import type { InboundShipment as InboundShipmentType, InboundShipmentItem } from
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import InboundShipmentModal from '../components/modules/InboundShipmentModal';
+import PageContainer from '../components/common/PageContainer';
 
 type ChecklistField = 'customsDocsDownloaded' | 'importAgentEmailed' | 'spreadsheetsUpdated';
 type ChecklistColor = 'blue' | 'purple' | 'green';
@@ -307,36 +308,36 @@ function InboundShipmentView() {
       {shipments.length === 0 ? (
         <p className="text-slate-400 text-center py-4">No shipments in this category.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="max-h-[calc(100vh-22rem)] overflow-auto">
           <table className="min-w-full divide-y divide-slate-700">
-            <thead className="bg-slate-700">
+            <thead className="sticky top-0 z-10 bg-slate-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider"></th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider"></th>
+                <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   PO Number
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Tracking No.
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Vendor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-slate-800 divide-y divide-slate-700">
-              {shipments.map((shipment: InboundShipmentType) => (
+              {shipments.map((shipment: InboundShipmentType, index) => (
                 <>
-                  <tr key={shipment.id} className="hover:bg-slate-700">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-300">
+                  <tr key={shipment.id} className={`${index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-700/30'} hover:bg-slate-700`}>
+                    <td className="p-card whitespace-nowrap text-sm text-slate-300">
                       <button
                         onClick={() => toggleExpanded(String(shipment.id ?? ''))}
                         className="px-2 py-1 rounded border border-slate-600 hover:bg-slate-600"
@@ -347,19 +348,19 @@ function InboundShipmentView() {
                         ></i>
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
+                    <td className="p-card whitespace-nowrap text-sm font-medium text-slate-200">
                       {shipment.poNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                    <td className="p-card whitespace-nowrap text-sm text-slate-400">
                       {shipment.trackingNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                    <td className="p-card whitespace-nowrap text-sm text-slate-400">
                       {shipment.vendor}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                    <td className="p-card whitespace-nowrap text-sm text-slate-400">
                       {shipment.shipmentType || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="p-card whitespace-nowrap text-sm">
                       <select
                         value={shipment.status}
                         onChange={e => handleStatusChange(String(shipment.id), e.target.value)}
@@ -373,7 +374,7 @@ function InboundShipmentView() {
                         ))}
                       </select>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="p-card whitespace-nowrap text-right text-sm font-medium">
                       {shipment.status !== 'Complete' && canEdit && (
                         <button
                           onClick={() => handleReceiveShipment(String(shipment.id), shipment.items?.length ?? 0)}
@@ -410,8 +411,8 @@ function InboundShipmentView() {
                   </tr>
                   {expandedRows[String(shipment.id ?? '')] && (
                     <tr className="bg-slate-900/40">
-                      <td className="px-4 py-4"></td>
-                      <td colSpan={6} className="px-6 py-4 text-sm text-slate-300">
+                      <td className="p-card"></td>
+                      <td colSpan={6} className="p-card text-sm text-slate-300">
                         <p className="text-xs text-slate-500 mb-3">
                           Added:{' '}
                           {shipment.created
@@ -506,9 +507,9 @@ function InboundShipmentView() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold text-cyan-400">Inbound Shipments (AIDA)</h2>
-        {canEdit && (
+      <PageContainer
+        title="Inbound Shipments (AIDA)"
+        actions={canEdit && (
           <button
             onClick={() => setShowAddShipmentModal(true)}
             disabled={isAddingShipment}
@@ -517,7 +518,7 @@ function InboundShipmentView() {
             {isAddingShipment ? 'Adding...' : 'Add New Shipment'}
           </button>
         )}
-      </div>
+      >
 
       {renderShipmentTable(inProgressShipments, 'In-Progress')}
 
@@ -538,6 +539,7 @@ function InboundShipmentView() {
           No inbound shipments yet. Add a new shipment.
         </p>
       )}
+      </PageContainer>
 
       <InboundShipmentModal
         isOpen={showAddShipmentModal}
