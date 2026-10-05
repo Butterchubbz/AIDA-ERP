@@ -1,4 +1,13 @@
 import type { HTMLAttributes, ReactNode } from 'react';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      spacing: ['card'],
+    },
+  },
+});
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
@@ -16,12 +25,9 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
  * Accepts className overrides for layout, sizing, or bespoke styling.
  */
 export default function Card({ children, className = '', ...rest }: CardProps) {
-  const hasPaddingOverride = /\bp(?:[xytrbl])?-\w+/.test(className);
-  const paddingClass = hasPaddingOverride ? '' : 'p-card';
-
   return (
     <div
-      className={`bg-surface rounded-lg shadow-card text-primary ${paddingClass} ${className}`.trim().replace(/\s+/g, ' ')}
+      className={twMerge('bg-surface rounded-lg p-card shadow-card border border-border text-primary', className)}
       {...rest}
     >
       {children}

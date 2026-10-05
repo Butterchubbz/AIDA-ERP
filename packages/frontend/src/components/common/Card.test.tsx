@@ -27,4 +27,23 @@ describe('Card component', () => {
     expect(cardElement.className).toContain('p-6');
     expect(cardElement.className).not.toContain('p-card');
   });
+
+  test('renders defaults without className and merges caller classes last', () => {
+    render(
+      <>
+        <Card>Default card</Card>
+        <Card className="bg-rose-500 p-6">Customized card</Card>
+      </>
+    );
+
+    const defaultCard = screen.getByText('Default card') as HTMLElement;
+    const customizedCard = screen.getByText('Customized card') as HTMLElement;
+
+    expect(defaultCard.className).toContain('bg-surface');
+    expect(defaultCard.className).toContain('p-card');
+    expect(customizedCard.className).toContain('bg-rose-500');
+    expect(customizedCard.className).toContain('p-6');
+    expect(customizedCard.className).not.toContain('bg-surface');
+    expect(customizedCard.className).not.toContain('p-card');
+  });
 });
