@@ -6,7 +6,7 @@ import ModalShell from './ModalShell';
 describe('ModalShell', () => {
   test('renders children and applies modal token classes and max-h-[85vh] overflow-y-auto', () => {
     render(
-      <ModalShell>
+      <ModalShell panelClassName="shadow-xl max-h-[90vh] overflow-hidden">
         <div>Modal Content</div>
       </ModalShell>
     );
@@ -20,6 +20,10 @@ describe('ModalShell', () => {
     expect(panel.className).toContain('bg-surface');
     expect(panel.className).toContain('max-h-[85vh]');
     expect(panel.className).toContain('overflow-y-auto');
+    expect(panel.className).toContain('shadow-modal');
+    expect(panel.className).not.toContain('shadow-xl');
+    expect(panel.className).not.toContain('max-h-[90vh]');
+    expect(panel.className).not.toContain('overflow-hidden');
   });
 
   test('locks body scroll while open and restores on unmount', () => {
@@ -90,8 +94,7 @@ describe('ModalShell', () => {
     expect(document.activeElement).toBe(triggerBtn);
 
     fireEvent.click(triggerBtn);
-    const insideBtn = screen.getByTestId('inside-btn');
-    expect(document.activeElement).toBe(insideBtn);
+    expect(document.activeElement).toBe(screen.getByRole('dialog').firstElementChild);
 
     // Close modal via Escape
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -109,13 +112,15 @@ describe('ModalShell', () => {
     const firstBtn = screen.getByTestId('first-btn');
     const secondBtn = screen.getByTestId('second-btn');
 
-    // Tab from last element cycles back to first element
-    secondBtn.focus();
-    expect(document.activeElement).toBe(secondBtn);
-
+    // Tab from the panel enters the focus trap at its first control.
     const dialog = screen.getByRole('dialog');
     const panel = dialog.firstElementChild as HTMLElement;
 
+    expect(document.activeElement).toBe(panel);
+    fireEvent.keyDown(panel, { key: 'Tab', shiftKey: false });
+    expect(document.activeElement).toBe(firstBtn);
+
+    secondBtn.focus();
     fireEvent.keyDown(panel, { key: 'Tab', shiftKey: false });
     expect(document.activeElement).toBe(firstBtn);
 

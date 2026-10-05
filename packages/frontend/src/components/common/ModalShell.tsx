@@ -1,4 +1,16 @@
 import { useEffect, useRef, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      shadow: ['modal'],
+    },
+    conflictingClassGroups: {
+      'overflow-y': ['overflow'],
+    },
+  },
+});
 
 interface ModalShellProps {
   children: ReactNode;
@@ -10,7 +22,7 @@ interface ModalShellProps {
 }
 
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export default function ModalShell({
   children,
@@ -23,29 +35,20 @@ export default function ModalShell({
   const panelRef = useRef<HTMLDivElement>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
-  // 1. Lock body scroll while open & save previous active element
   useEffect(() => {
     previousActiveElementRef.current = (document.activeElement as HTMLElement) || null;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    // Focus first focusable element inside the modal or the panel itself
-    if (panelRef.current) {
-      const focusables = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-      if (focusables.length > 0) {
-        focusables[0].focus();
-      } else {
-        panelRef.current.focus();
-      }
-    }
+    panelRef.current?.focus();
 
     return () => {
       document.body.style.overflow = originalOverflow;
-      previousActiveElementRef.current?.focus?.();
+      if (previousActiveElementRef.current?.isConnected) {
+        previousActiveElementRef.current.focus();
+      }
     };
   }, []);
 
-  // 2. Esc-to-close handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && onClose) {
@@ -58,13 +61,15 @@ export default function ModalShell({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // 3. Focus trap (Tab cycles inside)
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Tab' || !panelRef.current) return;
 
     const focusables = Array.from(
       panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-    ).filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true' && el.style.display !== 'none');
+    ).filter((el) => {
+      const style = window.getComputedStyle(el);
+      return !el.closest('[hidden], [aria-hidden="true"]') && style.display !== 'none' && style.visibility !== 'hidden';
+    });
 
     if (focusables.length === 0) {
       e.preventDefault();
@@ -74,27 +79,24 @@ export default function ModalShell({
     const firstElement = focusables[0];
     const lastElement = focusables[focusables.length - 1];
 
-    if (e.shiftKey) {
-      if (document.activeElement === firstElement || document.activeElement === panelRef.current) {
-        e.preventDefault();
-        lastElement.focus();
-      }
-    } else {
-      if (document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement.focus();
-      }
+    const activeElement = document.activeElement;
+    if (e.shiftKey && (activeElement === firstElement || activeElement === panelRef.current || !focusables.includes(activeElement as HTMLElement))) {
+      e.preventDefault();
+      lastElement.focus();
+    } else if (!e.shiftKey && (activeElement === lastElement || activeElement === panelRef.current || !focusables.includes(activeElement as HTMLElement))) {
+      e.preventDefault();
+      firstElement.focus();
     }
   };
 
   const defaultPanelClasses =
     'w-full max-w-3xl rounded-xl border border-border bg-surface p-6 text-primary shadow-modal max-h-[85vh] overflow-y-auto';
 
-  const effectivePanelClass = panelClassName
-    ? `${panelClassName} ${!panelClassName.includes('max-h-') ? 'max-h-[85vh]' : ''} ${!panelClassName.includes('overflow-') ? 'overflow-y-auto' : ''}`
-        .trim()
-        .replace(/\s+/g, ' ')
-    : defaultPanelClasses;
+  const effectivePanelClass = twMerge(
+    defaultPanelClasses,
+    panelClassName,
+    'shadow-modal max-h-[85vh] overflow-y-auto'
+  );
 
   return (
     <div
