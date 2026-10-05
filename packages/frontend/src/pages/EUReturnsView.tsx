@@ -5,6 +5,7 @@ import LabelPrinter from '../components/common/LabelPrinter'
 import ModalShell from '../components/common/ModalShell'
 import StatusBadge from '../components/common/StatusBadge'
 import TableShell from '../components/common/TableShell'
+import PageContainer from '../components/common/PageContainer'
 import { useAuth } from '../context/AuthContext'
 import { useCollectionCrud } from '../hooks/useCollectionCrud'
 import { formatISODate } from '../utils/date'
@@ -150,14 +151,12 @@ export default function EUReturnsView() {
   }
 
   return (
-    <div className="space-y-6 p-6 text-slate-100">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Logistics</p>
-          <h1 className="text-2xl font-bold text-white">EU Returns Log</h1>
-        </div>
-
-        {canEdit && (
+    <div className="p-6">
+      <PageContainer
+        title="EU Returns Log"
+        subtitle="Logistics"
+        variant="plain"
+        actions={canEdit && (
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
@@ -166,7 +165,7 @@ export default function EUReturnsView() {
             Log return
           </button>
         )}
-      </div>
+      </PageContainer>
 
       {error && (
         <div className="rounded-lg border border-red-700/50 bg-red-950/40 p-3 text-sm text-red-200">
@@ -174,24 +173,24 @@ export default function EUReturnsView() {
         </div>
       )}
 
-      <TableShell wrapperClassName="overflow-x-auto rounded-xl border border-slate-700 bg-slate-900/60">
-        <thead className="bg-slate-800/80 text-left text-xs uppercase tracking-[0.15em] text-slate-300">
+      <TableShell wrapperClassName="max-h-[calc(100vh-18rem)] overflow-auto rounded-xl border border-slate-700 bg-slate-900/60">
+        <thead className="sticky top-0 z-10 bg-slate-800/80 text-left text-xs uppercase tracking-[0.15em] text-slate-300">
           <tr>
-            <th className="px-4 py-3">RMA Number</th>
-            <th className="px-4 py-3">SKU</th>
-            <th className="px-4 py-3">Serial Number</th>
-            <th className="px-4 py-3">Return Reason</th>
-            <th className="px-4 py-3">Condition</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Processed By</th>
-            <th className="px-4 py-3">Received Date</th>
-            <th className="px-4 py-3 text-right">Print</th>
+            <th className="p-card">RMA Number</th>
+            <th className="p-card">SKU</th>
+            <th className="p-card">Serial Number</th>
+            <th className="p-card">Return Reason</th>
+            <th className="p-card">Condition</th>
+            <th className="p-card">Status</th>
+            <th className="p-card">Processed By</th>
+            <th className="p-card">Received Date</th>
+            <th className="p-card text-right">Print</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800 text-sm text-slate-200">
           {loading && (
             <tr>
-              <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+              <td colSpan={8} className="p-card text-center text-slate-400">
                 Loading returns…
               </td>
             </tr>
@@ -199,20 +198,20 @@ export default function EUReturnsView() {
 
           {!loading && sortedRecords.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+              <td colSpan={8} className="p-card text-center text-slate-400">
                 No return records found.
               </td>
             </tr>
           )}
 
-          {!loading && sortedRecords.map(record => (
-            <tr key={record.id} className="hover:bg-slate-800/70">
-              <td className="px-4 py-3 font-medium text-cyan-200">{record.rmaNumber}</td>
-              <td className="px-4 py-3">{record.sku}</td>
-              <td className="px-4 py-3">{record.serialNumber || '—'}</td>
-              <td className="px-4 py-3">{record.returnReason || '—'}</td>
-              <td className="px-4 py-3 capitalize">{record.condition || 'opened_functional'}</td>
-              <td className="px-4 py-3">
+          {!loading && sortedRecords.map((record, index) => (
+            <tr key={record.id} className={`${index % 2 === 0 ? 'bg-slate-900/20' : 'bg-slate-800/30'} hover:bg-slate-800/70`}>
+              <td className="p-card font-medium text-cyan-200">{record.rmaNumber}</td>
+              <td className="p-card">{record.sku}</td>
+              <td className="p-card">{record.serialNumber || '—'}</td>
+              <td className="p-card">{record.returnReason || '—'}</td>
+              <td className="p-card capitalize">{record.condition || 'opened_functional'}</td>
+              <td className="p-card">
                 {canEdit ? (
                   <select
                     value={record.status || 'pending_receipt'}
@@ -229,9 +228,9 @@ export default function EUReturnsView() {
                   <StatusBadge text={record.status || 'pending_receipt'} tone={getStatusTone(record.status || 'pending_receipt')} />
                 )}
               </td>
-              <td className="px-4 py-3">{record.processedBy || 'system'}</td>
-              <td className="px-4 py-3">{record.receivedAt ? formatISODate(record.receivedAt) : '—'}</td>
-              <td className="px-4 py-3 text-right">
+              <td className="p-card">{record.processedBy || 'system'}</td>
+              <td className="p-card">{record.receivedAt ? formatISODate(record.receivedAt) : '—'}</td>
+              <td className="p-card text-right">
                 <LabelPrinter
                   labelData={{
                     sku: record.sku || 'N/A',

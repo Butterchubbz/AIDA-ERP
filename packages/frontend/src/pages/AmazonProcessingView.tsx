@@ -3,6 +3,7 @@ import { useAmazonPOs } from '../hooks/useShippingModules';
 import { useAuth } from '../context/AuthContext';
 import AmazonPOForm from '../components/modules/AmazonPOForm';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import PageContainer from '../components/common/PageContainer';
 import { useMessageBox } from '../components/common/MessageBox';
 import type { AmazonPO, AmazonPOItem, AmazonListing } from '@aida/shared';
 import amazonLogo from '../assets/logos/generic-amazon.svg';
@@ -153,13 +154,10 @@ const AmazonProcessingView = () => {
   }
 
   return (
-    <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <div className="flex justify-between items-center mb-6 border-b pb-3">
-        <h2 className="text-2xl font-semibold text-cyan-400 flex items-center gap-2">
-          <img src={amazonLogo} alt="Amazon logo" className="w-7 h-7 object-contain" />
-          Amazon - Processing POs
-        </h2>
-        {canEdit && (
+    <PageContainer
+      title="Amazon - Processing POs"
+      titleAdornment={<img src={amazonLogo} alt="Amazon logo" className="w-7 h-7 object-contain" />}
+      actions={canEdit && (
           <button
             onClick={() => {
               setPoToEdit(null);
@@ -169,8 +167,8 @@ const AmazonProcessingView = () => {
           >
             <i className="fas fa-plus"></i> Add New PO
           </button>
-        )}
-      </div>
+      )}
+    >
 
       {purchaseOrders.length === 0 ? (
         <div className="text-center text-slate-400 p-8 border-2 border-dashed border-slate-700 rounded-lg">
@@ -238,36 +236,38 @@ const AmazonProcessingView = () => {
               {expandedPO === po.id && (
                 <div className="border-t border-slate-600 p-4">
                   <h4 className="font-semibold mb-2 text-slate-300">Items in this PO:</h4>
-                  <table className="min-w-full divide-y divide-slate-600">
-                    <thead className="bg-slate-600/50">
+                  <div className="max-h-[30vh] overflow-auto">
+                    <table className="min-w-full divide-y divide-slate-600">
+                    <thead className="sticky top-0 z-10 bg-slate-600/50">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           SKU
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Name
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Quantity
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-600">
                       {po.items.map((item: AmazonPOItem, index: number) => (
-                        <tr key={index}>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-300">
+                        <tr key={index} className={index % 2 === 0 ? 'bg-slate-800/30' : 'bg-slate-700/30'}>
+                          <td className="p-card whitespace-nowrap text-sm text-slate-300">
                             {item.sku}
                           </td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-200">
+                          <td className="p-card whitespace-nowrap text-sm text-slate-200">
                             {item.name}
                           </td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-bold text-cyan-300">
+                          <td className="p-card whitespace-nowrap text-sm text-right font-bold text-cyan-300">
                             {item.quantity}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -285,7 +285,7 @@ const AmazonProcessingView = () => {
         isSubmitting={isSubmitting}
         initialData={poToEdit}
       />
-    </div>
+    </PageContainer>
   );
 };
 

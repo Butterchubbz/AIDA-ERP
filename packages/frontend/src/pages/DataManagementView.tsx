@@ -6,6 +6,7 @@ import { useComponentInventory } from '../hooks/useInventoryModules';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import CsvImportModal from '../components/modules/CsvImportModal';
+import PageContainer from '../components/common/PageContainer';
 import { apiClient } from '../lib/apiClient';
 import {
   CsvFormatInstructions,
@@ -599,11 +600,7 @@ const DataManagementView = () => {
   };
 
   return (
-    <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3 flex items-center gap-2">
-        <i className="fas fa-cog" aria-hidden="true"></i>
-        AIDA Management
-      </h2>
+    <PageContainer title="AIDA Management" icon="fas fa-cog">
       <div className="space-y-6">
         <section className="border-t border-slate-700 pt-6">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Data</p>
@@ -938,7 +935,7 @@ const DataManagementView = () => {
           </div>
         </section>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

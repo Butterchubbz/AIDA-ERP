@@ -263,9 +263,9 @@ export default function ComponentForecastingView() {
         {/* ── TABLE VIEW ── */}
         {tab === 'table' && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
-            <div className="overflow-x-auto rounded-lg border border-slate-700">
+            <div className="max-h-[calc(100vh-22rem)] overflow-auto rounded-lg border border-slate-700">
               <table className="min-w-full divide-y divide-slate-700 text-sm">
-                <thead className="bg-slate-800">
+                <thead className="sticky top-0 z-10 bg-slate-800">
                   <tr>
                     {[
                       'Item',
@@ -280,7 +280,7 @@ export default function ComponentForecastingView() {
                     ].map(h => (
                       <th
                         key={h}
-                        className="px-3 py-2 text-left text-xs uppercase text-slate-400"
+                        className="p-card text-left text-xs uppercase text-slate-400"
                       >
                         {h}
                       </th>
@@ -288,18 +288,20 @@ export default function ComponentForecastingView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {forecastItems.map(item => (
+                  {forecastItems.map((item, index) => (
                     <tr
                       key={item.sku}
                       onClick={() => setSelectedSku(item.sku)}
                       className={`cursor-pointer ${
                         selectedItem?.sku === item.sku
                           ? 'bg-cyan-900/20'
-                          : 'bg-slate-900/30 hover:bg-slate-800/60'
+                          : index % 2 === 0
+                            ? 'bg-slate-900/30 hover:bg-slate-800/60'
+                            : 'bg-slate-800/40 hover:bg-slate-800/60'
                       }`}
                     >
-                      <td className="px-3 py-2 font-medium text-slate-200">{item.name}</td>
-                      <td className="px-3 py-2">
+                      <td className="p-card font-medium text-slate-200">{item.name}</td>
+                      <td className="p-card">
                         {item.vendorKeys.length === 0 ? (
                           <span className="text-slate-500">—</span>
                         ) : (
@@ -317,7 +319,7 @@ export default function ComponentForecastingView() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="p-card">
                         <div className="inline-flex items-center gap-1">
                           <span className="text-cyan-300">
                             {item.velocityPerWeek.toFixed(1)}
@@ -339,25 +341,25 @@ export default function ComponentForecastingView() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-slate-200">
+                      <td className="p-card text-slate-200">
                         {item.currentStock}
                         {item.inboundQty > 0 && (
                           <span className="ml-1 text-xs text-cyan-400">+{item.inboundQty}</span>
                         )}
                       </td>
-                      <td className={`px-3 py-2 ${depletionClass(item.weeksRemaining)}`}>
+                      <td className={`p-card ${depletionClass(item.weeksRemaining)}`}>
                         {depletionText(item.weeksRemaining)}
                       </td>
                       <td
-                        className="px-3 py-2 text-xs italic text-slate-400"
+                        className="p-card text-xs italic text-slate-400"
                         title="RP = ceil(velocity × leadTimeWeeks × (1 + safetyPct))"
                       >
                         {item.reorderPoint}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="p-card">
                         <TrendArrow trend={item.trend} />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="p-card">
                         <span
                           className={`rounded px-2 py-0.5 text-[10px] uppercase ${
                             confidenceBadgeClass(item.confidence)
@@ -366,7 +368,7 @@ export default function ComponentForecastingView() {
                           {item.confidence}
                         </span>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="p-card">
                         <StatusBadge text={item.status} tone={statusTone(item.status)} />
                       </td>
                     </tr>
@@ -375,7 +377,7 @@ export default function ComponentForecastingView() {
                     <tr>
                       <td
                         colSpan={9}
-                        className="px-3 py-8 text-center text-sm text-slate-500"
+                        className="p-card text-center text-sm text-slate-500"
                       >
                         No component SKUs found. Add component inventory items to get started.
                       </td>
@@ -569,9 +571,9 @@ export default function ComponentForecastingView() {
 
         {/* ── DISCREPANCIES TAB ── */}
         {tab === 'discrepancies' && (
-          <div className="overflow-x-auto rounded-lg border border-slate-700">
+          <div className="max-h-[calc(100vh-22rem)] overflow-auto rounded-lg border border-slate-700">
             <table className="min-w-full divide-y divide-slate-700 text-sm">
-              <thead className="bg-slate-800">
+              <thead className="sticky top-0 z-10 bg-slate-800">
                 <tr>
                   {[
                     'Item',
@@ -584,7 +586,7 @@ export default function ComponentForecastingView() {
                   ].map(h => (
                     <th
                       key={h}
-                      className="px-3 py-2 text-left text-xs uppercase text-slate-400"
+                      className="p-card text-left text-xs uppercase text-slate-400"
                     >
                       {h}
                     </th>
@@ -592,25 +594,25 @@ export default function ComponentForecastingView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {discrepancyItems.map(item => (
-                  <tr key={item.sku} className="bg-slate-900/30">
-                    <td className="px-3 py-2 text-slate-200">{item.name}</td>
-                    <td className="px-3 py-2 font-mono text-cyan-300">{item.sku}</td>
-                    <td className="px-3 py-2 text-slate-300">
+                {discrepancyItems.map((item, index) => (
+                  <tr key={item.sku} className={index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-800/40'}>
+                    <td className="p-card text-slate-200">{item.name}</td>
+                    <td className="p-card font-mono text-cyan-300">{item.sku}</td>
+                    <td className="p-card text-slate-300">
                       {item.salesVelocity?.toFixed(1) ?? '—'}
                     </td>
-                    <td className="px-3 py-2 text-slate-300">
+                    <td className="p-card text-slate-300">
                       {item.inventoryVelocity?.toFixed(1) ?? '—'}
                     </td>
-                    <td className="px-3 py-2 text-amber-300">
+                    <td className="p-card text-amber-300">
                       {item.discrepancyPct !== null
                         ? `${(item.discrepancyPct * 100).toFixed(1)}%`
                         : '—'}
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-300">
+                    <td className="p-card text-xs text-slate-300">
                       {discrepancyCause(item)}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="p-card">
                       <div className="flex flex-wrap gap-1">
                         <button
                           onClick={() => acceptSignal(item.sku, 'sales')}
@@ -638,7 +640,7 @@ export default function ComponentForecastingView() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-3 py-8 text-center text-sm text-slate-500"
+                      className="p-card text-center text-sm text-slate-500"
                     >
                       No discrepancies detected for the current forecast window.
                     </td>
