@@ -329,26 +329,26 @@ function PurchaseOrderView() {
         </div>
       </div>
 
-      <div className="overflow-x-auto mb-6">
+      <div className="max-h-[calc(100vh-22rem)] overflow-auto mb-6">
         <table className="min-w-full divide-y divide-slate-700">
-          <thead className="bg-slate-700">
+          <thead className="sticky top-0 z-10 bg-slate-700">
             <tr>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">SKU</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Item Name</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">On Hand</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Inbound</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Vel/Wk</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Reorder Point</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Order Qty</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Unit</th>
-              <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Notes</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">SKU</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Item Name</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">On Hand</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Inbound</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Vel/Wk</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Reorder Point</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Order Qty</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Unit</th>
+              <th className="p-card text-left text-xs uppercase text-slate-300">Notes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {orderRows.map(row => (
-              <tr key={`${row.sku}-${row.name}`} className={row.covered ? 'bg-slate-700/30' : ''}>
-                <td className="px-3 py-2 font-mono text-cyan-300 text-sm">{row.sku}</td>
-                <td className="px-3 py-2 text-sm text-slate-200">
+            {orderRows.map((row, index) => (
+              <tr key={`${row.sku}-${row.name}`} className={row.covered ? 'bg-slate-700/30' : index % 2 === 0 ? 'bg-slate-900/20' : 'bg-slate-800/30'}>
+                <td className="p-card font-mono text-cyan-300 text-sm">{row.sku}</td>
+                <td className="p-card text-sm text-slate-200">
                   {row.name}
                   {row.covered && (
                     <span className="ml-2 px-2 py-0.5 text-[10px] rounded bg-slate-600 text-slate-300">
@@ -356,24 +356,24 @@ function PurchaseOrderView() {
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-sm text-slate-300">{row.currentStock}</td>
-                <td className="px-3 py-2 text-sm text-slate-300">{row.inboundQty}</td>
-                <td className="px-3 py-2 text-sm text-slate-300">{row.velocityPerWeek.toFixed(1)}</td>
-                <td className="px-3 py-2 text-sm text-slate-300">{row.reorderPoint}</td>
+                <td className="p-card text-sm text-slate-300">{row.currentStock}</td>
+                <td className="p-card text-sm text-slate-300">{row.inboundQty}</td>
+                <td className="p-card text-sm text-slate-300">{row.velocityPerWeek.toFixed(1)}</td>
+                <td className="p-card text-sm text-slate-300">{row.reorderPoint}</td>
                 <td
-                  className="px-3 py-2 text-sm text-slate-200 font-semibold"
+                  className="p-card text-sm text-slate-200 font-semibold"
                   title={`ceil((${row.velocityPerWeek.toFixed(2)} x ${FORECAST_HORIZON_WEEKS}) + ${row.reorderPoint} - (${row.currentStock} + ${row.inboundQty}))`}
                 >
                   {row.orderQty}
                 </td>
-                <td className="px-3 py-2 text-sm">
+                <td className="p-card text-sm">
                   <input
                     value={unitsBySku[row.sku] ?? row.unit}
                     onChange={e => setUnitsBySku(prev => ({ ...prev, [row.sku]: e.target.value }))}
                     className="w-full px-2 py-1 rounded bg-slate-800 border border-slate-600"
                   />
                 </td>
-                <td className="px-3 py-2 text-sm">
+                <td className="p-card text-sm">
                   <input
                     value={notesBySku[row.sku] ?? row.notes}
                     onChange={e => setNotesBySku(prev => ({ ...prev, [row.sku]: e.target.value }))}

@@ -8,6 +8,7 @@ import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { getSortIndicator, naturalSort } from '../utils/tableHelpers';
 import RefurbishedDeviceForm from '../components/modules/RefurbishedDeviceForm';
+import PageContainer from '../components/common/PageContainer';
 import type { RefurbishedDevice } from '@aida/shared';
 import type { HistoryRecord } from '@aida/shared';
 import refurbishedLogo from '../assets/logos/generic-rma.svg';
@@ -188,11 +189,10 @@ function RefurbishedDeviceView() {
   }
 
   return (
-    <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3 flex items-center gap-2">
-        <img src={refurbishedLogo} alt="Refurbished and RMA logo" className="w-7 h-7 object-contain" />
-        Refurbished/RMA Devices
-      </h2>
+    <PageContainer
+      title="Refurbished/RMA Devices"
+      titleAdornment={<img src={refurbishedLogo} alt="Refurbished and RMA logo" className="w-7 h-7 object-contain" />}
+    >
 
       <div className="mb-6">
         <input
@@ -212,33 +212,33 @@ function RefurbishedDeviceView() {
         </div>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="overflow-x-auto">
+          <div className="max-h-[calc(100vh-22rem)] overflow-auto">
             <table className="min-w-full divide-y divide-slate-700">
-              <thead className="bg-slate-700">
+              <thead className="sticky top-0 z-10 bg-slate-700">
                 <tr>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('name')}
                   >
                     Device Name {getSortIndicator(sortColumn, 'name', sortDirection)}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('sku')}
                   >
                     SKU {getSortIndicator(sortColumn, 'sku', sortDirection)}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
+                    className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-600 group"
                     onClick={() => handleSort('refurbishedStock')}
                   >
                     Refurbished Stock{' '}
                     {getSortIndicator(sortColumn, 'refurbishedStock', sortDirection)}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Notes
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -261,24 +261,24 @@ function RefurbishedDeviceView() {
                             ref={prov.innerRef}
                             {...prov.draggableProps}
                             {...prov.dragHandleProps}
-                            className="hover:bg-slate-700"
+                            className={`${index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-700/30'} hover:bg-slate-700`}
                           >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-100">
+                            <td className="p-card whitespace-nowrap text-sm font-medium text-slate-100">
                               {device.name}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                            <td className="p-card whitespace-nowrap text-sm text-slate-300">
                               {device.sku}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-300 font-bold">
+                            <td className="p-card whitespace-nowrap text-sm text-orange-300 font-bold">
                               {device.refurbishedStock || 0}
                             </td>
                             <td
-                              className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 max-w-xs truncate"
+                              className="p-card whitespace-nowrap text-sm text-slate-400 max-w-xs truncate"
                               title={device.notes}
                             >
                               {device.notes}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td className="p-card whitespace-nowrap text-right text-sm font-medium">
                               <div className="flex justify-end items-center space-x-2">
                                 {canEdit && (
                                   <>
@@ -357,54 +357,54 @@ function RefurbishedDeviceView() {
                   No history records found for this item.
                 </p>
               ) : (
-                <div className="overflow-x-auto max-h-96">
+                <div className="max-h-96 overflow-auto">
                   <table className="min-w-full divide-y divide-slate-700">
-                    <thead className="bg-slate-700">
+                    <thead className="sticky top-0 z-10 bg-slate-700">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Timestamp
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Field
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Old Value
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           New Value
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Change
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                           Changed By
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-slate-800 divide-y divide-slate-700">
-                      {itemHistoryRecords.map((record: HistoryRecord) => (
-                        <tr key={record.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
+                      {itemHistoryRecords.map((record: HistoryRecord, index: number) => (
+                        <tr key={record.id} className={index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-700/30'}>
+                          <td className="p-card whitespace-nowrap text-sm text-slate-200">
                             {record.timestamp}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                          <td className="p-card whitespace-nowrap text-sm text-slate-400">
                             {record.field}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                          <td className="p-card whitespace-nowrap text-sm text-slate-400">
                             {record.oldValue}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                          <td className="p-card whitespace-nowrap text-sm text-slate-400">
                             {record.newValue}
                           </td>
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
+                            className={`p-card whitespace-nowrap text-sm font-semibold ${
                               record.change < 0 ? 'text-red-400' : 'text-emerald-400'
                             }`}
                           >
                             {record.change > 0 ? '+' : ''}
                             {record.change}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                          <td className="p-card whitespace-nowrap text-sm text-slate-400">
                             {record.changedByEmail}
                           </td>
                         </tr>
@@ -425,7 +425,7 @@ function RefurbishedDeviceView() {
           </div>,
           document.body
         )}
-    </div>
+    </PageContainer>
   );
 }
 

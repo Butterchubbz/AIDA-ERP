@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext';
+import PageContainer from '../components/common/PageContainer';
 
 const ProfileView = () => {
   const { user, userRoles } = useAuth();
@@ -8,8 +9,7 @@ const ProfileView = () => {
   }
 
   return (
-    <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3">My Profile</h2>
+    <PageContainer title="My Profile">
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-400">Email</label>
@@ -22,7 +22,7 @@ const ProfileView = () => {
           </p>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

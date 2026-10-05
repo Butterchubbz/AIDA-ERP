@@ -300,21 +300,21 @@ function RMATrackerView() {
      */
     <>
       <td
-        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200 cursor-help"
+        className="p-card whitespace-nowrap text-sm font-medium text-slate-200 cursor-help"
         title={`Entered: ${rma.created ? formatLocalDateTime(rma.created) : 'N/A'}`}
       >
         {rma.ticketNumber || 'N/A'}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
+      <td className="p-card whitespace-nowrap text-sm font-medium text-slate-200">
         {rma.customerName}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{rma.orderNumber}</td>
-      <td className="px-6 py-4 whitespace-pre-wrap text-sm text-slate-400">{rma.device}</td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 flex items-center">
+      <td className="p-card whitespace-nowrap text-sm text-slate-400">{rma.orderNumber}</td>
+      <td className="p-card whitespace-pre-wrap text-sm text-slate-400">{rma.device}</td>
+      <td className="p-card whitespace-nowrap text-sm text-slate-400">
         {rma.trackingNumber || 'N/A'}
         {rma.trackingNumber && getCarrierIcon(detectCarrier(rma.trackingNumber))}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm">
+      <td className="p-card whitespace-nowrap text-sm">
         <select
           value={rma.status}
           onChange={e => {
@@ -330,7 +330,7 @@ function RMATrackerView() {
           ))}
         </select>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+      <td className="p-card whitespace-nowrap text-right text-sm font-medium">
         {rma.trackingNumber && (
           <button
             onClick={() => openTrackingPage(rma.trackingNumber)}
@@ -379,9 +379,9 @@ function RMATrackerView() {
       )}
 
       <h3 className="text-xl font-semibold text-cyan-300 mb-4">Active RMAs</h3>
-      <div className="overflow-x-auto">
+      <div className="max-h-[calc(100vh-24rem)] overflow-auto">
         <table className="min-w-full divide-y divide-slate-700 rounded-xl overflow-hidden">
-          <thead className="bg-slate-700">
+          <thead className="sticky top-0 z-10 bg-slate-700">
             <tr className="rounded-t-xl">
               {(
                 [
@@ -395,7 +395,7 @@ function RMATrackerView() {
               ).map(({ label, col }) => (
                 <th
                   key={col}
-                  className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200"
+                  className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200"
                   onClick={() => {
                     if (sortColumn === col) {
                       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -415,7 +415,7 @@ function RMATrackerView() {
                   )}
                 </th>
               ))}
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -459,9 +459,9 @@ function RMATrackerView() {
           ></i>
         </button>
         {showCompleted && (
-          <div className="overflow-x-auto mt-4">
+          <div className="max-h-[40vh] overflow-auto mt-4">
             <table className="min-w-full divide-y divide-slate-700">
-              <thead className="bg-slate-700">
+              <thead className="sticky top-0 z-10 bg-slate-700">
                 <tr>
                   {(
                     [
@@ -475,7 +475,7 @@ function RMATrackerView() {
                   ).map(({ label, col }) => (
                     <th
                       key={col}
-                      className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200"
+                      className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200"
                       onClick={() => {
                         if (sortColumn === col) {
                           setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -495,7 +495,7 @@ function RMATrackerView() {
                       )}
                     </th>
                   ))}
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>

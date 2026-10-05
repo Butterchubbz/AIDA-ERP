@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMessageBox } from '../components/common/MessageBox';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import OrderModal from '../components/modules/OrderModal';
+import PageContainer from '../components/common/PageContainer';
 import type { Order } from '@aida/shared';
 
 // --- Main QuoteApprovedView Component ---
@@ -86,41 +87,41 @@ function QuoteApprovedView() {
   const renderOrderTable = (orders: Order[], title: string) => (
     <div className="mb-8">
       <h3 className="text-xl font-semibold text-cyan-300 mb-3">{title}</h3>
-      <div className="overflow-x-auto">
+      <div className="max-h-[calc(100vh-22rem)] overflow-auto">
         <table className="min-w-full divide-y divide-slate-700">
-          <thead className="bg-slate-700">
+          <thead className="sticky top-0 z-10 bg-slate-700">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+              <th className="p-card text-left text-xs font-medium text-slate-400 uppercase">
                 Order Number
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+              <th className="p-card text-left text-xs font-medium text-slate-400 uppercase">
                 SKU
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+              <th className="p-card text-left text-xs font-medium text-slate-400 uppercase">
                 Amount
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">
+              <th className="p-card text-left text-xs font-medium text-slate-400 uppercase">
                 Status
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">
+              <th className="p-card text-right text-xs font-medium text-slate-400 uppercase">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-slate-800 divide-y divide-slate-700">
-            {orders.map((order: Order) => (
-              <tr key={order.id} className="hover:bg-slate-700">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-200">
+            {orders.map((order: Order, index) => (
+              <tr key={order.id} className={`${index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-700/30'} hover:bg-slate-700`}>
+                <td className="p-card whitespace-nowrap text-sm font-medium text-slate-200">
                   {order.orderNumber}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{order.sku}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                <td className="p-card whitespace-nowrap text-sm text-slate-400">{order.sku}</td>
+                <td className="p-card whitespace-nowrap text-sm text-slate-400">
                   {order.amount}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                <td className="p-card whitespace-nowrap text-sm text-slate-400">
                   {order.status}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="p-card whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => openEditModal(order)}
                     className="text-yellow-400 hover:text-yellow-300"
@@ -144,9 +145,10 @@ function QuoteApprovedView() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-cyan-400">Quote Approved Orders</h2>
-        {canEdit && (
+      <PageContainer
+        title="Quote Approved Orders"
+        variant="plain"
+        actions={canEdit && (
           <button
             onClick={() => {
               setOrderToEdit(null);
@@ -157,7 +159,7 @@ function QuoteApprovedView() {
             Add New Order
           </button>
         )}
-      </div>
+      >
 
       {renderOrderTable(inProgressOrders, 'In-Progress')}
 
@@ -172,6 +174,7 @@ function QuoteApprovedView() {
           {showCompleted && renderOrderTable(completedOrders, 'Completed')}
         </div>
       )}
+      </PageContainer>
 
       <OrderModal
         isOpen={showModal}
