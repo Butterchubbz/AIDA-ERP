@@ -58,6 +58,7 @@ const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
 const SUPERUSER_BOOTSTRAP_RATE_LIMIT_MAX = 5
 const SUPERUSER_BOOTSTRAP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
 const superuserBootstrapAttempts = new Map<string, { count: number; windowStart: number }>()
+let loggedUnauthenticatedCollectionBootstrap = false
 
 // Collections gated by the setup wizard — must all exist for setupComplete to be true.
 const REQUIRED_COLLECTIONS = [
@@ -485,7 +486,13 @@ export async function evaluateSetupState(): Promise<SetupState> {
  * without needing to re-run the setup wizard.
  */
 export async function bootstrapMissingCollections(): Promise<void> {
-  await ensurePocketBaseAuth()
+  if (!isPbAuthenticated()) {
+    if (!loggedUnauthenticatedCollectionBootstrap) {
+      console.info('[Bootstrap] Skipping collection checks while PocketBase is unauthenticated; the setup wizard will provision collections.')
+      loggedUnauthenticatedCollectionBootstrap = true
+    }
+    return
+  }
 
   for (const name of REQUIRED_COLLECTIONS) {
     await ensureCollection(name, COLLECTION_FIELDS[name])

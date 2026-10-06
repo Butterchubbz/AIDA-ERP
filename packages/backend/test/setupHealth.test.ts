@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import pb from '../src/lib/pocketbase.js'
-import { checkSetupHealth, evaluateSetupState } from '../src/routes/setup.js'
+import { bootstrapMissingCollections, checkSetupHealth, evaluateSetupState } from '../src/routes/setup.js'
 
 interface MockResponse {
   statusCode?: number
@@ -49,6 +49,43 @@ function withTestHarness(fn: () => Promise<void>): () => Promise<void> {
     }
   }
 }
+
+test('collection bootstrap backs off without a PocketBase session and logs only once', async () => {
+  const originalToken = pb.authStore.token
+  const originalRecord = pb.authStore.record
+  const originalCollection = pb.collection.bind(pb)
+  const originalSend = pb.send.bind(pb)
+  const originalInfo = console.info
+  let pbCalls = 0
+  const infoMessages: string[] = []
+  pb.authStore.clear()
+  ;(pb as unknown as { collection: typeof pb.collection }).collection = (() => {
+    pbCalls++
+    throw new Error('Collection bootstrap must not access PocketBase without a session')
+  }) as typeof pb.collection
+  ;(pb as unknown as { send: typeof pb.send }).send = (async () => {
+    pbCalls++
+    throw new Error('Collection bootstrap must not send requests without a session')
+  }) as typeof pb.send
+  console.info = (message?: unknown) => { infoMessages.push(String(message)) }
+
+  try {
+    await bootstrapMissingCollections()
+    await bootstrapMissingCollections()
+
+    assert.equal(pbCalls, 0)
+    assert.equal(infoMessages.length, 1)
+  } finally {
+    ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    ;(pb as unknown as { send: typeof pb.send }).send = originalSend
+    console.info = originalInfo
+    if (originalToken) {
+      pb.authStore.save(originalToken, originalRecord)
+    } else {
+      pb.authStore.clear()
+    }
+  }
+})
 
 test(
   'setup health reports setupComplete: false and users: missing when zero users exist',
