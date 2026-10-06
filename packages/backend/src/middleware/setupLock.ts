@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import pb, { authenticatePocketBase, isPbAuthenticated } from '../lib/pocketbase.js'
+import pb, { isPbAuthenticated } from '../lib/pocketbase.js'
 
 let isSetupCachedComplete: boolean = false
 const SYSTEM_USER_ID = 'system'
@@ -53,16 +53,16 @@ async function getSystemPreferences(): Promise<SystemPreferencesRecord | null> {
 }
 
 async function confirmSetupComplete(): Promise<boolean> {
+  if (!isPbAuthenticated()) {
+    return false
+  }
+
   const key = process.env.AIDA_ENCRYPTION_KEY?.trim() ?? ''
   if (!/^[0-9a-fA-F]{64}$/.test(key)) {
     return false
   }
 
   try {
-    if (!isPbAuthenticated()) {
-      await authenticatePocketBase()
-    }
-
     for (const collectionName of REQUIRED_SETUP_COLLECTIONS) {
       try {
         await (pb as any).collection(collectionName).getList(1, 1)
@@ -105,6 +105,11 @@ export async function requireSetupAccess(
   next: NextFunction
 ): Promise<void> {
   try {
+    if (isSetupCachedComplete && !isPbAuthenticated()) {
+      res.status(503).json({ error: 'PocketBase authentication is unavailable.' })
+      return
+    }
+
     if (!await isSetupComplete()) {
       next()
       return
@@ -126,7 +131,7 @@ export async function requireSetupAccess(
 
 export async function createSetupAccessToken(): Promise<string | null> {
   if (!isPbAuthenticated()) {
-    await authenticatePocketBase()
+    throw new Error('PocketBase superuser authentication is required to create the setup access token.')
   }
 
   const existing = await getSystemPreferences()

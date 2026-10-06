@@ -50,6 +50,16 @@ interface CreateFirstAdminRequest {
 }
 
 const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
+let loggedUnauthenticatedSetupMode = false
+
+function logUnauthenticatedSetupModeOnce(): void {
+  if (loggedUnauthenticatedSetupMode) {
+    return
+  }
+
+  console.info('[Setup] PocketBase superuser session unavailable; collection checks are deferred until the wizard provisions it.')
+  loggedUnauthenticatedSetupMode = true
+}
 
 // Defense-in-depth throttle for the superuser bootstrap endpoint: per-IP,
 // in-memory only (resets on process restart — acceptable here because the
@@ -58,7 +68,6 @@ const ENCRYPTION_KEY_NAME = 'AIDA_ENCRYPTION_KEY'
 const SUPERUSER_BOOTSTRAP_RATE_LIMIT_MAX = 5
 const SUPERUSER_BOOTSTRAP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
 const superuserBootstrapAttempts = new Map<string, { count: number; windowStart: number }>()
-let loggedUnauthenticatedCollectionBootstrap = false
 
 // Collections gated by the setup wizard — must all exist for setupComplete to be true.
 const REQUIRED_COLLECTIONS = [
@@ -149,12 +158,6 @@ function getBackendEnvPath(): string {
 function isValidEncryptionKey(value: string | undefined): value is string {
   if (!value) return false
   return /^[0-9a-fA-F]{64}$/.test(value)
-}
-
-async function ensurePocketBaseAuth(): Promise<void> {
-  if (!isPbAuthenticated()) {
-    await authenticatePocketBase()
-  }
 }
 
 async function upsertEnvVariable(filePath: string, name: string, value: string): Promise<void> {
@@ -412,9 +415,8 @@ export async function evaluateSetupState(): Promise<SetupState> {
       ? 'invalid'
       : 'missing'
 
-  try {
-    await ensurePocketBaseAuth()
-  } catch {
+  if (!isPbAuthenticated()) {
+    logUnauthenticatedSetupModeOnce()
     const failed: Record<string, CollectionCheck> = {}
     for (const name of REQUIRED_COLLECTIONS) {
       failed[name] = 'failed'
@@ -487,10 +489,7 @@ export async function evaluateSetupState(): Promise<SetupState> {
  */
 export async function bootstrapMissingCollections(): Promise<void> {
   if (!isPbAuthenticated()) {
-    if (!loggedUnauthenticatedCollectionBootstrap) {
-      console.info('[Bootstrap] Skipping collection checks while PocketBase is unauthenticated; the setup wizard will provision collections.')
-      loggedUnauthenticatedCollectionBootstrap = true
-    }
+    logUnauthenticatedSetupModeOnce()
     return
   }
 
@@ -518,7 +517,6 @@ export async function checkSetupHealth(_req: Request, res: Response): Promise<vo
   let pocketbaseStatus: 'ok' | 'fail' = 'ok'
 
   try {
-    await ensurePocketBaseAuth()
     await pb.send('/api/health', { method: 'GET' })
   } catch {
     pocketbaseStatus = 'fail'
@@ -711,11 +709,9 @@ export async function completeSetup(_req: Request, res: Response): Promise<void>
  * Creates all required PocketBase collections when missing.
  */
 export async function initCollections(_req: Request, res: Response): Promise<void> {
-  try {
-    await ensurePocketBaseAuth()
-  } catch (err: unknown) {
-    console.error('[Setup] PocketBase authentication failed:', err)
-    res.status(503).json({ error: 'PocketBase is not ready' })
+  if (!isPbAuthenticated()) {
+    logUnauthenticatedSetupModeOnce()
+    res.status(503).json({ error: 'PocketBase superuser authentication is required to initialize collections.' })
     return
   }
 
@@ -754,9 +750,13 @@ export async function setWorkspaceMode(req: Request, res: Response): Promise<voi
     return
   }
 
-  try {
-    await ensurePocketBaseAuth()
+  if (!isPbAuthenticated()) {
+    logUnauthenticatedSetupModeOnce()
+    res.status(503).json({ error: 'PocketBase superuser authentication is required to save workspace mode.' })
+    return
+  }
 
+  try {
     const existing = await pb
       .collection('userPreferences')
       .getFirstListItem('userId = "system"', { requestKey: null })
@@ -800,9 +800,13 @@ export async function createFirstAdmin(req: Request, res: Response): Promise<voi
     return
   }
 
-  try {
-    await ensurePocketBaseAuth()
+  if (!isPbAuthenticated()) {
+    logUnauthenticatedSetupModeOnce()
+    res.status(503).json({ error: 'PocketBase superuser authentication is required to create the first admin.' })
+    return
+  }
 
+  try {
     await patchMissingFields('users', [
       { name: 'name', type: 'text' },
       { name: 'role', type: 'text' },
@@ -858,6 +862,12 @@ export async function createFirstAdmin(req: Request, res: Response): Promise<voi
 }
 
 export async function completeSetupWizard(_req: Request, res: Response): Promise<void> {
+  if (!isPbAuthenticated()) {
+    logUnauthenticatedSetupModeOnce()
+    res.status(503).json({ error: 'PocketBase superuser authentication is required to complete setup.' })
+    return
+  }
+
   try {
     const setupToken = await createSetupAccessToken()
     if (setupToken) {

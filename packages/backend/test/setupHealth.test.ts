@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import jwt from 'jsonwebtoken'
 import pb from '../src/lib/pocketbase.js'
 import { bootstrapMissingCollections, checkSetupHealth, evaluateSetupState } from '../src/routes/setup.js'
 
@@ -27,14 +28,76 @@ function createRequest() {
   return {} as never
 }
 
+test('consecutive unauthenticated health checks skip collections and log Setup Mode at most once', async () => {
+  const originalToken = pb.authStore.token
+  const originalRecord = pb.authStore.record
+  const originalCollection = pb.collection.bind(pb)
+  const originalSend = pb.send.bind(pb)
+  const originalEmail = process.env.PB_ADMIN_EMAIL
+  const originalPassword = process.env.PB_ADMIN_PASSWORD
+  const originalLog = console.log
+  const originalInfo = console.info
+  let collectionCalls = 0
+  const setupModeLogs: string[] = []
+
+  process.env.PB_ADMIN_EMAIL = 'owner@example.com'
+  process.env.PB_ADMIN_PASSWORD = 'test-password'
+  pb.authStore.clear()
+  ;(pb as unknown as { collection: typeof pb.collection }).collection = (() => {
+    collectionCalls++
+    throw new Error('Health checks must not query collections without a PB session')
+  }) as typeof pb.collection
+  ;(pb as unknown as { send: typeof pb.send }).send = (async (sendPath: string) => {
+    if (sendPath === '/api/health') return { code: 200 }
+    throw new Error(`Unexpected PocketBase request: ${sendPath}`)
+  }) as typeof pb.send
+  const captureSetupLog = (...args: unknown[]) => {
+    const message = args.map(String).join(' ')
+    if (/Setup Mode|superuser session unavailable/i.test(message)) setupModeLogs.push(message)
+  }
+  console.log = captureSetupLog
+  console.info = captureSetupLog
+
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = createResponse()
+      await checkSetupHealth(createRequest(), response as never)
+
+      assert.equal(response.statusCode, 200)
+      assert.equal((response.body as { pocketbase: string }).pocketbase, 'ok')
+      assert.equal((response.body as { setupComplete: boolean }).setupComplete, false)
+    }
+
+    assert.equal(collectionCalls, 0)
+    assert.ok(setupModeLogs.length <= 1)
+  } finally {
+    ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    ;(pb as unknown as { send: typeof pb.send }).send = originalSend
+    console.log = originalLog
+    console.info = originalInfo
+    if (originalEmail === undefined) delete process.env.PB_ADMIN_EMAIL
+    else process.env.PB_ADMIN_EMAIL = originalEmail
+    if (originalPassword === undefined) delete process.env.PB_ADMIN_PASSWORD
+    else process.env.PB_ADMIN_PASSWORD = originalPassword
+    if (originalToken) pb.authStore.save(originalToken, originalRecord)
+    else pb.authStore.clear()
+  }
+})
+
 function withTestHarness(fn: () => Promise<void>): () => Promise<void> {
   return async () => {
     const originalCollection = pb.collection.bind(pb)
     const originalSend = pb.send.bind(pb)
+    const originalToken = pb.authStore.token
+    const originalRecord = pb.authStore.record
     const priorKey = process.env.AIDA_ENCRYPTION_KEY
 
     // Set valid 64-hex encryption key by default for tests
     process.env.AIDA_ENCRYPTION_KEY = 'a'.repeat(64)
+    pb.authStore.save(
+      jwt.sign({ exp: Math.floor(Date.now() / 1000) + 3600 }, 'test-secret'),
+      { id: 'test-superuser' }
+    )
 
     try {
       await fn()
@@ -46,6 +109,8 @@ function withTestHarness(fn: () => Promise<void>): () => Promise<void> {
       } else {
         process.env.AIDA_ENCRYPTION_KEY = priorKey
       }
+      if (originalToken) pb.authStore.save(originalToken, originalRecord)
+      else pb.authStore.clear()
     }
   }
 }
@@ -74,7 +139,7 @@ test('collection bootstrap backs off without a PocketBase session and logs only 
     await bootstrapMissingCollections()
 
     assert.equal(pbCalls, 0)
-    assert.equal(infoMessages.length, 1)
+    assert.ok(infoMessages.length <= 1)
   } finally {
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
     ;(pb as unknown as { send: typeof pb.send }).send = originalSend

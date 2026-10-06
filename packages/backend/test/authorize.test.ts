@@ -432,6 +432,7 @@ test('setup mutation endpoints stay open before setup completes', async () => {
 })
 
 test('completed setup requires the matching hashed bearer token', async () => {
+  const restoreAuth = setPocketBaseAuthenticated()
   const originalCollection = pb.collection.bind(pb)
   const token = 'operator-setup-token'
   const setupTokenHash = createHash('sha256').update(token).digest('hex')
@@ -454,10 +455,12 @@ test('completed setup requires the matching hashed bearer token', async () => {
   } finally {
     resetSetupLockForTests()
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    restoreAuth()
   }
 })
 
 test('setup access fails closed when completed-state token lookup errors', async () => {
+  const restoreAuth = setPocketBaseAuthenticated()
   const originalCollection = pb.collection.bind(pb)
   ;(pb as unknown as { collection: typeof pb.collection }).collection = ((name: string) => {
     if (name === 'userPreferences') {
@@ -475,6 +478,7 @@ test('setup access fails closed when completed-state token lookup errors', async
   } finally {
     resetSetupLockForTests()
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    restoreAuth()
   }
 })
 

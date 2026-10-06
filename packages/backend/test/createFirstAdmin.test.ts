@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import jwt from 'jsonwebtoken'
 import pb from '../src/lib/pocketbase.js'
 import { createFirstAdmin } from '../src/routes/setup.js'
 
@@ -31,12 +32,20 @@ function withTestHarness(fn: () => Promise<void>): () => Promise<void> {
   return async () => {
     const originalCollection = pb.collection.bind(pb)
     const originalSend = pb.send.bind(pb)
+    const originalToken = pb.authStore.token
+    const originalRecord = pb.authStore.record
+    pb.authStore.save(
+      jwt.sign({ exp: Math.floor(Date.now() / 1000) + 3600 }, 'test-secret'),
+      { id: 'test-superuser' }
+    )
 
     try {
       await fn()
     } finally {
       ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
       ;(pb as unknown as { send: typeof pb.send }).send = originalSend
+      if (originalToken) pb.authStore.save(originalToken, originalRecord)
+      else pb.authStore.clear()
     }
   }
 }
