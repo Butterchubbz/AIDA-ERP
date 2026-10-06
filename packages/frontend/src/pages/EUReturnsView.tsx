@@ -165,7 +165,7 @@ export default function EUReturnsView() {
             Log return
           </button>
         )}
-      </PageContainer>
+      >
 
       {error && (
         <div className="rounded-lg border border-red-700/50 bg-red-950/40 p-3 text-sm text-red-200">
@@ -363,6 +363,7 @@ export default function EUReturnsView() {
           </form>
         </ModalShell>
       )}
+      </PageContainer>
     </div>
   )
 }
