@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import pb from '../lib/pocketbase.js'
+import pb, { isPbAuthenticated } from '../lib/pocketbase.js'
 
 const REDACTED_FIELDS = new Set([
   'password',
@@ -20,6 +20,20 @@ const REDACTED_FIELDS = new Set([
   'consumerkey',
 ])
 const MAX_CHANGES_BYTES = 8 * 1024
+let loggedUnauthenticatedAuditSkip = false
+
+function shouldSkipAudit(): boolean {
+  if (isPbAuthenticated()) {
+    return false
+  }
+
+  if (!loggedUnauthenticatedAuditSkip) {
+    console.info('[Audit] Skipping audit writes while PocketBase is unauthenticated (Setup Mode).')
+    loggedUnauthenticatedAuditSkip = true
+  }
+
+  return true
+}
 
 export type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'failed-login'
 
@@ -65,6 +79,10 @@ export function sanitizeAuditChanges(changes: Record<string, unknown> = {}): Rec
 }
 
 export async function writeAuditRecord(details: AuditDetails): Promise<void> {
+  if (shouldSkipAudit()) {
+    return
+  }
+
   try {
     await pb.collection('auditLog').create({
       actor: details.actor,
@@ -141,6 +159,11 @@ function changesForRequest(req: Request, previousRecord: Record<string, unknown>
 /** Records successful API mutations after their response has been sent. */
 export async function auditMutations(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!['POST', 'PATCH', 'DELETE'].includes(req.method) || !req.path.startsWith('/api/') || req.path === '/api/auth/login') {
+    next()
+    return
+  }
+
+  if (shouldSkipAudit()) {
     next()
     return
   }

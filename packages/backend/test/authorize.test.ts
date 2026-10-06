@@ -57,6 +57,21 @@ function createAuditResponse(statusCode = 201) {
   return response
 }
 
+function setPocketBaseAuthenticated(): () => void {
+  const originalToken = pb.authStore.token
+  const originalRecord = pb.authStore.record
+  const token = jwt.sign({ exp: Math.floor(Date.now() / 1000) + 3600 }, 'test-secret')
+  pb.authStore.save(token, { id: 'test-superuser' })
+
+  return () => {
+    if (originalToken) {
+      pb.authStore.save(originalToken, originalRecord)
+    } else {
+      pb.authStore.clear()
+    }
+  }
+}
+
 async function invokeSetupAccess(token?: string): Promise<{ statusCode?: number; nextCalled: boolean }> {
   const response = createResponse()
   let nextCalled = false
@@ -178,6 +193,7 @@ test('Viewer cannot update their own email', async () => {
 })
 
 test('audit middleware writes a record for a successful create', async () => {
+  const restoreAuth = setPocketBaseAuthenticated()
   const originalCollection = pb.collection.bind(pb)
   const records: unknown[] = []
   ;(pb as unknown as { collection: typeof pb.collection }).collection = ((name: string) => {
@@ -215,10 +231,12 @@ test('audit middleware writes a record for a successful create', async () => {
     }])
   } finally {
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    restoreAuth()
   }
 })
 
 test('audit middleware records actual pre-update values and delete URL IDs', async () => {
+  const restoreAuth = setPocketBaseAuthenticated()
   const originalCollection = pb.collection.bind(pb)
   const records: Array<Record<string, unknown>> = []
   ;(pb as unknown as { collection: typeof pb.collection }).collection = ((name: string) => {
@@ -269,10 +287,12 @@ test('audit middleware records actual pre-update values and delete URL IDs', asy
     assert.equal(records[1]?.recordId, 'device-id')
   } finally {
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    restoreAuth()
   }
 })
 
 test('audit middleware skips failed mutations', async () => {
+  const restoreAuth = setPocketBaseAuthenticated()
   const originalCollection = pb.collection.bind(pb)
   let writes = 0
   ;(pb as unknown as { collection: typeof pb.collection }).collection = ((name: string) => {
@@ -298,6 +318,52 @@ test('audit middleware skips failed mutations', async () => {
     assert.equal(writes, 0)
   } finally {
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    restoreAuth()
+  }
+})
+
+test('audit middleware skips PocketBase reads and writes in Setup Mode and logs once', async () => {
+  const originalToken = pb.authStore.token
+  const originalRecord = pb.authStore.record
+  const originalCollection = pb.collection.bind(pb)
+  const originalInfo = console.info
+  let collectionCalls = 0
+  const infoMessages: string[] = []
+  pb.authStore.clear()
+  ;(pb as unknown as { collection: typeof pb.collection }).collection = (() => {
+    collectionCalls++
+    throw new Error('PocketBase should not be accessed while unauthenticated')
+  }) as typeof pb.collection
+  console.info = (message?: unknown) => { infoMessages.push(String(message)) }
+
+  try {
+    const response = createAuditResponse()
+    let nextCalled = false
+    await auditMutations(
+      {
+        method: 'PATCH',
+        path: '/api/inventory/devices/device-id',
+        body: { name: 'Updated Device' },
+        user: createViewerFromJwt(),
+        get: () => '',
+      } as never,
+      response as never,
+      () => { nextCalled = true }
+    )
+    response.emit('finish')
+    await writeAuditRecord({ actor: 'viewer@example.com', action: 'update', collection: 'inventory/devices' })
+
+    assert.equal(nextCalled, true)
+    assert.equal(collectionCalls, 0)
+    assert.equal(infoMessages.length, 1)
+  } finally {
+    ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    console.info = originalInfo
+    if (originalToken) {
+      pb.authStore.save(originalToken, originalRecord)
+    } else {
+      pb.authStore.clear()
+    }
   }
 })
 
@@ -322,6 +388,7 @@ test('audit changes redact secrets and truncate oversized payloads', () => {
 })
 
 test('audit write failures do not fail the request', async () => {
+  const restoreAuth = setPocketBaseAuthenticated()
   const originalCollection = pb.collection.bind(pb)
   ;(pb as unknown as { collection: typeof pb.collection }).collection = ((name: string) => {
     if (name === 'auditLog') {
@@ -338,6 +405,7 @@ test('audit write failures do not fail the request', async () => {
     }))
   } finally {
     ;(pb as unknown as { collection: typeof pb.collection }).collection = originalCollection
+    restoreAuth()
   }
 })
 
