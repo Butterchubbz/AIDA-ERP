@@ -40,6 +40,17 @@ function isAllowedOrigin(requestUrl: URL): boolean {
   })
 }
 
+function isSameOrigin(requestUrl: URL, request: Request): boolean {
+  const configuredPort = String(process.env.PORT || '3001')
+  const originPort = requestUrl.port || (requestUrl.protocol === 'https:' ? '443' : '80')
+
+  return (
+    requestUrl.protocol === `${request.protocol}:` &&
+    requestUrl.hostname.toLowerCase() === request.hostname.toLowerCase() &&
+    originPort === configuredPort
+  )
+}
+
 export function csrfOriginGuard(req: Request, res: Response, next: NextFunction): void {
   if (!req.path.startsWith('/api')) {
     next()
@@ -68,7 +79,7 @@ export function csrfOriginGuard(req: Request, res: Response, next: NextFunction)
     return
   }
 
-  if (!isAllowedOrigin(requestUrl)) {
+  if (!isSameOrigin(requestUrl, req) && !isAllowedOrigin(requestUrl)) {
     console.warn(
       `[CSRF] Blocked mutating request from origin ${candidate}. Allowed origins: ${ALLOWED_ORIGINS.join(', ')}`
     )
