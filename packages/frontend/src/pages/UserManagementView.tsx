@@ -4,6 +4,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
 import type { User } from '@aida/shared';
 import usersLogo from '../assets/logos/generic-users.svg';
+import PageContainer from '../components/common/PageContainer';
 
 const AIDA_FUNCTIONS = [
   'Inventory',
@@ -59,22 +60,21 @@ const UserManagementView = () => {
   }
 
   return (
-    <div className="bg-slate-800 p-6 rounded-lg shadow-xl text-slate-100">
-      <h2 className="text-2xl font-semibold text-cyan-400 mb-6 border-b pb-3 flex items-center gap-2">
-        <img src={usersLogo} alt="User management logo" className="w-7 h-7 object-contain" />
-        User Management
-      </h2>
-      <div className="overflow-x-auto">
+    <PageContainer
+      title="User Management"
+      titleAdornment={<img src={usersLogo} alt="User management logo" className="w-7 h-7 object-contain" />}
+    >
+      <div className="max-h-[calc(100vh-18rem)] overflow-auto">
         <table className="min-w-full divide-y divide-slate-700">
-          <thead className="bg-slate-700">
+          <thead className="sticky top-0 z-10 bg-slate-700">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                 User Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <th className="p-card text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Roles
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <th className="p-card text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -82,14 +82,14 @@ const UserManagementView = () => {
           <tbody className="bg-slate-800 divide-y divide-slate-700">
             {users
               .filter(u => !!u.id)
-              .map((userItem: User) => {
+              .map((userItem: User, index) => {
                 const uid: string = String(userItem.id);
                 return (
-                  <tr key={uid}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-100">
+                  <tr key={uid} className={index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-700/30'}>
+                <td className="p-card whitespace-nowrap text-sm font-medium text-slate-100">
                   {userItem.email}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                <td className="p-card whitespace-nowrap text-sm">
                   <div className="grid grid-cols-3 gap-4">
                     {AIDA_FUNCTIONS.map(func => (
                       <div key={func} className="flex items-center">
@@ -130,7 +130,7 @@ const UserManagementView = () => {
                     ))}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="p-card whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => handleSaveChanges(uid)}
                     disabled={uid === user?.id}
@@ -145,7 +145,7 @@ const UserManagementView = () => {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

@@ -4,6 +4,7 @@ import type { ShippingCarrier, ShippingRecord, ShippingStatus } from '@aida/shar
 import ModalShell from '../components/common/ModalShell'
 import StatusBadge from '../components/common/StatusBadge'
 import TableShell from '../components/common/TableShell'
+import PageContainer from '../components/common/PageContainer'
 import { useAuth } from '../context/AuthContext'
 import { useCollectionCrud } from '../hooks/useCollectionCrud'
 import { formatISODate } from '../utils/date'
@@ -142,14 +143,12 @@ export default function ShippingHistoryView() {
   }
 
   return (
-    <div className="space-y-6 p-6 text-slate-100">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Logistics</p>
-          <h1 className="text-2xl font-bold text-white">Shipping History</h1>
-        </div>
-
-        {canEdit && (
+    <div className="p-6">
+      <PageContainer
+        title="Shipping History"
+        subtitle="Logistics"
+        variant="plain"
+        actions={canEdit && (
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
@@ -158,7 +157,7 @@ export default function ShippingHistoryView() {
             Log shipment
           </button>
         )}
-      </div>
+      >
 
       {error && (
         <div className="rounded-lg border border-red-700/50 bg-red-950/40 p-3 text-sm text-red-200">
@@ -166,23 +165,23 @@ export default function ShippingHistoryView() {
         </div>
       )}
 
-      <TableShell wrapperClassName="overflow-x-auto rounded-xl border border-slate-700 bg-slate-900/60">
-        <thead className="bg-slate-800/80 text-left text-xs uppercase tracking-[0.15em] text-slate-300">
+      <TableShell wrapperClassName="max-h-[calc(100vh-18rem)] overflow-auto rounded-xl border border-slate-700 bg-slate-900/60">
+        <thead className="sticky top-0 z-10 bg-slate-800/80 text-left text-xs uppercase tracking-[0.15em] text-slate-300">
           <tr>
-            <th className="px-4 py-3">Tracking Number</th>
-            <th className="px-4 py-3">Carrier</th>
-            <th className="px-4 py-3">Destination</th>
-            <th className="px-4 py-3">Ship Date</th>
-            <th className="px-4 py-3">Weight (kg)</th>
-            <th className="px-4 py-3">Postage Cost</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Shipped Items</th>
+            <th className="p-card">Tracking Number</th>
+            <th className="p-card">Carrier</th>
+            <th className="p-card">Destination</th>
+            <th className="p-card">Ship Date</th>
+            <th className="p-card">Weight (kg)</th>
+            <th className="p-card">Postage Cost</th>
+            <th className="p-card">Status</th>
+            <th className="p-card">Shipped Items</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800 text-sm text-slate-200">
           {loading && (
             <tr>
-              <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+              <td colSpan={8} className="p-card text-center text-slate-400">
                 Loading shipments…
               </td>
             </tr>
@@ -190,21 +189,21 @@ export default function ShippingHistoryView() {
 
           {!loading && sortedRecords.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+              <td colSpan={8} className="p-card text-center text-slate-400">
                 No shipping records found.
               </td>
             </tr>
           )}
 
-          {!loading && sortedRecords.map(record => (
-            <tr key={record.id} className="hover:bg-slate-800/70">
-              <td className="px-4 py-3 font-medium text-cyan-200">{record.trackingNumber}</td>
-              <td className="px-4 py-3">{record.carrier}</td>
-              <td className="px-4 py-3">{record.destination}</td>
-              <td className="px-4 py-3">{record.shipDate ? formatISODate(record.shipDate) : '—'}</td>
-              <td className="px-4 py-3">{record.packageWeight ?? 0}</td>
-              <td className="px-4 py-3">{record.postageCost ?? 0}</td>
-              <td className="px-4 py-3">
+          {!loading && sortedRecords.map((record, index) => (
+            <tr key={record.id} className={`${index % 2 === 0 ? 'bg-slate-900/20' : 'bg-slate-800/30'} hover:bg-slate-800/70`}>
+              <td className="p-card font-medium text-cyan-200">{record.trackingNumber}</td>
+              <td className="p-card">{record.carrier}</td>
+              <td className="p-card">{record.destination}</td>
+              <td className="p-card">{record.shipDate ? formatISODate(record.shipDate) : '—'}</td>
+              <td className="p-card">{record.packageWeight ?? 0}</td>
+              <td className="p-card">{record.postageCost ?? 0}</td>
+              <td className="p-card">
                 {canEdit ? (
                   <select
                     value={record.status || 'label_created'}
@@ -220,7 +219,7 @@ export default function ShippingHistoryView() {
                   <StatusBadge text={record.status || 'label_created'} tone={getStatusTone(record.status || 'label_created')} />
                 )}
               </td>
-              <td className="px-4 py-3">
+              <td className="p-card">
                 {Array.isArray(record.itemsShipped) && record.itemsShipped.length > 0
                   ? record.itemsShipped.map(item => `${item.sku ?? 'ITEM'}:${item.qty ?? 1}`).join(', ')
                   : '—'}
@@ -229,6 +228,7 @@ export default function ShippingHistoryView() {
           ))}
         </tbody>
       </TableShell>
+      </PageContainer>
 
       {isCreateOpen && (
         <ModalShell onClose={() => setCreateOpen(false)} panelClassName="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-900 p-6 text-slate-100 shadow-2xl">

@@ -575,39 +575,39 @@ function ForecastingSettingsView() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          <div className="max-h-[calc(100vh-22rem)] overflow-auto">
             <table className="min-w-full divide-y divide-slate-700">
-              <thead className="bg-slate-700">
+              <thead className="sticky top-0 z-10 bg-slate-700">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">
+                  <th className="p-card text-left text-xs uppercase text-slate-300">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
                       onChange={e => toggleAllVisible(e.target.checked)}
                     />
                   </th>
-                  <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Item Name</th>
-                  <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">SKU</th>
-                  <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Assigned Vendors</th>
-                  <th className="px-3 py-2 text-left text-xs uppercase text-slate-300">Actions</th>
+                  <th className="p-card text-left text-xs uppercase text-slate-300">Item Name</th>
+                  <th className="p-card text-left text-xs uppercase text-slate-300">SKU</th>
+                  <th className="p-card text-left text-xs uppercase text-slate-300">Assigned Vendors</th>
+                  <th className="p-card text-left text-xs uppercase text-slate-300">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredItems.map(item => {
+                {filteredItems.map((item, index) => {
                   const assigned = skuMapState[item.sku] ?? []
                   const options = Object.keys(skuVendorConfigs)
                   return (
-                    <tr key={`${skuMode}-${item.id}`}>
-                      <td className="px-3 py-2 text-sm">
+                    <tr key={`${skuMode}-${item.id}`} className={index % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-700/30'}>
+                      <td className="p-card text-sm">
                         <input
                           type="checkbox"
                           checked={selectedSkus.has(item.sku)}
                           onChange={e => toggleSkuSelection(item.sku, e.target.checked)}
                         />
                       </td>
-                      <td className="px-3 py-2 text-sm text-slate-200">{item.name}</td>
-                      <td className="px-3 py-2 font-mono text-cyan-300 text-sm">{item.sku}</td>
-                      <td className="px-3 py-2 text-sm">
+                      <td className="p-card text-sm text-slate-200">{item.name}</td>
+                      <td className="p-card font-mono text-cyan-300 text-sm">{item.sku}</td>
+                      <td className="p-card text-sm">
                         <div className="flex flex-wrap items-center gap-2">
                           {assigned.length === 0 && (
                             <span className="text-slate-500">Unassigned</span>
@@ -653,7 +653,7 @@ function ForecastingSettingsView() {
                           </select>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-sm">
+                      <td className="p-card text-sm">
                         <button
                           onClick={() => clearSkuAssignmentsForSku(item.sku)}
                           className="px-2 py-1 rounded bg-slate-700"
