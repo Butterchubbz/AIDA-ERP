@@ -6,6 +6,12 @@
   --tw-text-opacity: 1;
 }
 
+html,
+body,
+#root {
+  background-color: #0f172a;
+}
+
 /* Custom scrollbar styles (optional, for aesthetics) */
 ::-webkit-scrollbar {
   width: 8px;
@@ -37,7 +43,6 @@ body {
   min-height: 100vh;
   /* Prevent horizontal scrolling if content overflows */
   overflow-x: hidden;
-  /* Use Tailwind classes for background and text color in layout components, not here. */
 }
 
 /*
